@@ -8,7 +8,9 @@ export const it = {
     loading: 'Caricamento...',
     error: 'Errore',
     success: 'Successo',
-    retry: 'Riprova'
+    retry: 'Riprova',
+    enable: 'Abilita',
+    disable: 'Disabilita'
   },
 
   navigation: {
@@ -29,6 +31,27 @@ export const it = {
     theme: 'Tema',
     lightTheme: 'Chiaro',
     darkTheme: 'Scuro',
+    security: 'Sicurezza',
+    securityDescription: 'Proteggi le azioni sensibili',
+    pin: 'Codice PIN',
+    pinDescription: 'PIN per operazioni critiche',
+    setPin: 'Imposta PIN',
+    changePin: 'Modifica PIN',
+    removePin: 'Rimuovi PIN',
+    enterCurrentPin: 'Inserisci PIN attuale',
+    enterNewPin: 'Inserisci nuovo PIN',
+    confirmPin: 'Conferma PIN',
+    whatToDo: 'Cosa vuoi fare?',
+    biometricAuth: 'Autenticazione biometrica',
+    biometricDescription: 'Face ID, Touch ID o impronta',
+    faceId: 'Face ID',
+    touchId: 'Touch ID',
+    biometric: 'Biometrico',
+    biometricEnabled: 'Abilitato',
+    biometricDisabled: 'Disabilitato',
+    authenticateToAccess: 'Autentica per accedere',
+    tapToAuthenticate: 'Tocca per autenticarti',
+    usePinInstead: 'Usa PIN invece',
     about: 'Informazioni',
     version: 'Versione {{version}}'
   },

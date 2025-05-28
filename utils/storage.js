@@ -3,7 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 const STORAGE_KEYS = {
   THEME: 'theme',
   LANGUAGE: 'language',
-  USER_SETTINGS: 'userSettings'
+  USER_SETTINGS: 'userSettings',
+  PIN: 'pin',
+  BIOMETRIC_ENABLED: 'biometric_enabled'
 }
 
 export const storage = {

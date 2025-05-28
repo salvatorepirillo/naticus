@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback, Alert } from 'react-native'
 import { ThemeContext } from '../../contexts/ThemeContext'
 import { LanguageContext } from '../../contexts/LanguageContext'
 import { languageNames } from '../../locales'
@@ -7,51 +7,92 @@ import { languageNames } from '../../locales'
 export default class LanguageSelector extends Component {
   static contextType = ThemeContext
 
-  state = {
-    modalVisible: false
+  constructor (props) {
+    super(props)
+    this.state = { modalVisible: false }
+    console.log('LanguageSelector: Constructor called')
+  }
+
+  componentDidCatch (error, errorInfo) {
+    console.error('LanguageSelector crashed:', error, errorInfo)
+    Alert.alert('Errore', `LanguageSelector crash: ${error.message}`)
   }
 
   showModal = () => {
-    this.setState({ modalVisible: true })
+    try {
+      console.log('LanguageSelector: Opening modal')
+      this.setState({ modalVisible: true })
+    } catch (error) {
+      console.error('LanguageSelector: Error opening modal:', error)
+      Alert.alert('Errore', `Errore apertura modal: ${error.message}`)
+    }
   }
 
   hideModal = () => {
-    this.setState({ modalVisible: false })
+    try {
+      console.log('LanguageSelector: Closing modal')
+      this.setState({ modalVisible: false })
+    } catch (error) {
+      console.error('LanguageSelector: Error closing modal:', error)
+    }
   }
 
   selectLanguage = (langCode, changeLanguage) => {
-    changeLanguage(langCode)
-    this.hideModal()
+    try {
+      console.log('LanguageSelector: Selecting language:', langCode)
+      changeLanguage(langCode)
+      this.hideModal()
+    } catch (error) {
+      console.error('LanguageSelector: Error selecting language:', error)
+      Alert.alert('Errore', `Errore selezione lingua: ${error.message}`)
+    }
   }
 
   render () {
-    const { theme } = this.context
+    try {
+      console.log('LanguageSelector: Rendering')
+      const { theme } = this.context
 
-    return (
-      <LanguageContext.Consumer>
-        {(languageContext) => {
-          const { currentLanguage, changeLanguage, availableLanguages } = languageContext
+      if (!theme) {
+        console.error('LanguageSelector: No theme context')
+        return <Text>Errore: Tema non disponibile</Text>
+      }
 
-          return (
-            <View>
-              <TouchableOpacity
-                style={[styles.selector, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-                onPress={this.showModal}
-              >
-                <Text style={[styles.selectedText, { color: theme.colors.text }]}>
-                  {languageNames[currentLanguage]}
-                </Text>
-              </TouchableOpacity>
+      return (
+        <LanguageContext.Consumer>
+          {(languageContext) => {
+            try {
+              console.log('LanguageSelector: Language context:', languageContext)
 
-              <Modal
-                animationType='fade'
-                transparent
-                visible={this.state.modalVisible}
-                onRequestClose={this.hideModal}
-                statusBarTranslucent
-              >
-                <ThemeContext.Provider value={this.context}>
-                  <LanguageContext.Provider value={languageContext}>
+              if (!languageContext) {
+                console.error('LanguageSelector: No language context')
+                return <Text>Errore: Contesto lingua non disponibile</Text>
+              }
+
+              const { currentLanguage, changeLanguage, availableLanguages } = languageContext
+
+              if (!currentLanguage || !availableLanguages) {
+                console.error('LanguageSelector: Missing language data')
+                return <Text>Errore: Dati lingua mancanti</Text>
+              }
+
+              return (
+                <View>
+                  <TouchableOpacity
+                    style={[styles.selector, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+                    onPress={this.showModal}
+                  >
+                    <Text style={[styles.selectedText, { color: theme.colors.text }]}>
+                      {languageNames[currentLanguage] || currentLanguage}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <Modal
+                    animationType='fade'
+                    transparent
+                    visible={this.state.modalVisible}
+                    onRequestClose={this.hideModal}
+                  >
                     <TouchableWithoutFeedback onPress={this.hideModal}>
                       <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
                         <TouchableWithoutFeedback>
@@ -71,7 +112,7 @@ export default class LanguageSelector extends Component {
                                   { color: langCode === currentLanguage ? theme.colors.primary : theme.colors.text }
                                 ]}
                                 >
-                                  {languageNames[langCode]}
+                                  {languageNames[langCode] || langCode}
                                 </Text>
                               </TouchableOpacity>
                             ))}
@@ -79,14 +120,20 @@ export default class LanguageSelector extends Component {
                         </TouchableWithoutFeedback>
                       </View>
                     </TouchableWithoutFeedback>
-                  </LanguageContext.Provider>
-                </ThemeContext.Provider>
-              </Modal>
-            </View>
-          )
-        }}
-      </LanguageContext.Consumer>
-    )
+                  </Modal>
+                </View>
+              )
+            } catch (error) {
+              console.error('LanguageSelector: Error in Consumer render:', error)
+              return <Text>Errore rendering: {error.message}</Text>
+            }
+          }}
+        </LanguageContext.Consumer>
+      )
+    } catch (error) {
+      console.error('LanguageSelector: Error in render:', error)
+      return <Text>Errore generale: {error.message}</Text>
+    }
   }
 }
 
