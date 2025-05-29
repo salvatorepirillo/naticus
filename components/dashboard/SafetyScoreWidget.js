@@ -183,11 +183,6 @@ export default class SafetyScoreWidget extends Component {
                 <Text style={[styles.value, { color: theme.colors.text }]}>
                   {param.value} {param.unit}
                 </Text>
-                {param.penalty > 0 && (
-                  <Text style={[styles.penalty, { color: theme.colors.danger }]}>
-                    -{param.penalty}
-                  </Text>
-                )}
               </View>
             </View>
           </View>
