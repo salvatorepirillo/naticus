@@ -1,5 +1,5 @@
 import { Component } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput } from 'react-native'
 import * as Location from 'expo-location'
 import { ThemeContext } from '../../contexts/ThemeContext'
 import { LanguageContext } from '../../contexts/LanguageContext'
@@ -14,12 +14,13 @@ export default class WeatherWidget extends Component {
       weatherData: null,
       marineData: null,
       locationData: null,
-      currentLatitude: null,
-      currentLongitude: null,
       loading: false,
       error: null,
       lastUpdate: null,
-      expanded: false
+      expanded: false,
+      searchQuery: '',
+      lastFetchLat: null,
+      lastFetchLon: null
     }
   }
 
@@ -37,13 +38,12 @@ export default class WeatherWidget extends Component {
   }
 
   getCurrentLocation = async () => {
-    this.setState({ loading: true })
+    this.setState({ loading: true, error: null })
 
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
         this.setState({ error: 'Permesso GPS necessario per localizzazione', loading: false })
-        // Notifica il Dashboard anche in caso di errore
         if (this.props.onWeatherUpdate) {
           this.props.onWeatherUpdate(null, null)
         }
@@ -54,10 +54,9 @@ export default class WeatherWidget extends Component {
       const lat = location.coords.latitude
       const lon = location.coords.longitude
 
-      this.setState({
-        currentLatitude: lat,
-        currentLongitude: lon
-      })
+      if (this.weatherInterval) {
+        clearInterval(this.weatherInterval)
+      }
 
       await this.handleFetchWeatherData(lat, lon)
 
@@ -65,20 +64,92 @@ export default class WeatherWidget extends Component {
     } catch (error) {
       console.warn('Errore GPS:', error)
       this.setState({ error: 'Impossibile ottenere la posizione GPS', loading: false })
-      // Notifica il Dashboard anche in caso di errore
       if (this.props.onWeatherUpdate) {
         this.props.onWeatherUpdate(null, null)
       }
     }
   }
 
-  handleFetchWeatherData = async (lat, lon) => {
-    if (!lat || !lon) {
-      console.warn('Coordinate GPS non disponibili')
+  handleSearchQueryChange = (query) => {
+    this.setState({ searchQuery: query })
+  }
+
+  handleSearchSubmit = async () => {
+    const { searchQuery } = this.state
+    if (!searchQuery || searchQuery.trim() === '') {
+      this.setState({ error: 'Inserisci una località da cercare', loading: false })
+      if (this.props.onWeatherUpdate) {
+        this.props.onWeatherUpdate(null, null)
+      }
       return
     }
 
     this.setState({ loading: true, error: null })
+
+    try {
+      const geocodeResponse = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery.trim())}&count=1&language=it&format=json`
+      )
+
+      if (!geocodeResponse.ok) {
+        const errorData = await geocodeResponse.json().catch(() => ({}))
+        throw new Error(errorData.reason || 'Errore nel geocoding della località')
+      }
+
+      const geocodeData = await geocodeResponse.json()
+
+      if (!geocodeData.results || geocodeData.results.length === 0) {
+        this.setState({ error: 'Località non trovata', loading: false })
+        if (this.props.onWeatherUpdate) {
+          this.props.onWeatherUpdate(null, null)
+        }
+        return
+      }
+
+      const { latitude, longitude, name, admin1, country } = geocodeData.results[0]
+
+      if (this.weatherInterval) {
+        clearInterval(this.weatherInterval)
+      }
+
+      const initialLocationDetails = {
+        city: name,
+        locality: name,
+        principalSubdivision: admin1 || '',
+        countryName: country || '',
+        latitude,
+        longitude
+      }
+
+      await this.handleFetchWeatherData(latitude, longitude, initialLocationDetails)
+
+      this.weatherInterval = setInterval(() => this.handleFetchWeatherData(latitude, longitude), 30 * 60 * 1000)
+      this.setState({ searchQuery: '' })
+    } catch (error) {
+      console.warn('Errore ricerca località:', error)
+      this.setState({ error: error.message || 'Impossibile cercare la località', loading: false })
+      if (this.props.onWeatherUpdate) {
+        this.props.onWeatherUpdate(null, null)
+      }
+    }
+  }
+
+  handleFetchWeatherData = async (lat, lon, initialLocationDetails = null) => {
+    if (!lat || !lon) {
+      console.warn('Coordinate GPS non disponibili')
+      if (this.props.onWeatherUpdate) {
+        this.props.onWeatherUpdate(null, null)
+      }
+      return
+    }
+
+    const stateUpdate = { loading: true, error: null, lastFetchLat: lat, lastFetchLon: lon }
+    if (initialLocationDetails) {
+      stateUpdate.locationData = initialLocationDetails
+    } else {
+      stateUpdate.locationData = null // Clear previous location data if not providing new initial
+    }
+    this.setState(stateUpdate)
 
     try {
       const weatherResponse = await fetch(
@@ -89,9 +160,21 @@ export default class WeatherWidget extends Component {
         `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_direction,wave_period,wind_wave_height,wind_wave_direction,wind_wave_period,swell_wave_height,swell_wave_direction,swell_wave_period&hourly=wave_height,wave_direction,wave_period,wind_wave_height,wind_wave_direction,wind_wave_period,swell_wave_height,swell_wave_direction,swell_wave_period&daily=wave_height_max,wave_direction_dominant,wave_period_max,wind_wave_height_max,wind_wave_direction_dominant,wind_wave_period_max,swell_wave_height_max,swell_wave_direction_dominant,swell_wave_period_max&timezone=auto`
       )
 
-      const locationResponse = await fetch(
-        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=it`
-      )
+      let newLocationData = initialLocationDetails
+      try {
+        const locationResponse = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=it`
+        )
+        if (locationResponse.ok) {
+          newLocationData = await locationResponse.json()
+        } else {
+          console.warn('Failed to fetch from BigDataCloud, using preliminary location data if available.')
+          if (!initialLocationDetails) newLocationData = null
+        }
+      } catch (locError) {
+        console.warn('Error fetching location from BigDataCloud:', locError)
+        if (!initialLocationDetails) newLocationData = null
+      }
 
       if (!weatherResponse.ok || !marineResponse.ok) {
         throw new Error('Errore nel recupero dei dati meteo')
@@ -99,25 +182,22 @@ export default class WeatherWidget extends Component {
 
       const weatherData = await weatherResponse.json()
       const marineData = await marineResponse.json()
-      const locationData = locationResponse.ok ? await locationResponse.json() : null
 
       this.setState({
         weatherData,
         marineData,
-        locationData,
+        locationData: newLocationData,
         loading: false,
         lastUpdate: new Date(),
         error: null
       })
 
-      // Comunica i dati al Dashboard
       if (this.props.onWeatherUpdate) {
         this.props.onWeatherUpdate(weatherData, marineData)
       }
     } catch (error) {
       console.warn('Errore fetch weather:', error)
       this.setState({ error: error.message, loading: false })
-      // Notifica il Dashboard anche in caso di errore
       if (this.props.onWeatherUpdate) {
         this.props.onWeatherUpdate(null, null)
       }
@@ -218,7 +298,7 @@ export default class WeatherWidget extends Component {
               {seaCondition.icon}
             </Text>
             <Text style={[styles.compactValue, { color: theme.colors.text }]}>
-              {marine.wave_height ? `${marine.wave_height.toFixed(1)}m` : 'N/A'}
+              {marine.wave_height ? `${marine.wave_height.toFixed(1)}m` : t('weather.location')}
             </Text>
           </View>
         </View>
@@ -261,7 +341,7 @@ export default class WeatherWidget extends Component {
 
         <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            {t('weather.current')}
+            {t('weather.current', 'Attuale')}
           </Text>
 
           <View style={styles.currentWeather}>
@@ -273,14 +353,14 @@ export default class WeatherWidget extends Component {
                 {Math.round(current.temperature_2m)}°C
               </Text>
               <Text style={[styles.feelsLike, { color: theme.colors.textSecondary }]}>
-                {t('weather.feelsLike')} {Math.round(current.apparent_temperature)}°C
+                {t('weather.feelsLike', 'Percepiti')} {Math.round(current.apparent_temperature)}°C
               </Text>
             </View>
 
             <View style={styles.currentDetails}>
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                  {t('weather.humidity')}:
+                  {t('weather.humidity', 'Umidità')}:
                 </Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                   {current.relative_humidity_2m}%
@@ -289,7 +369,7 @@ export default class WeatherWidget extends Component {
 
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                  {t('weather.pressure')}:
+                  {t('weather.pressure', 'Pressione')}:
                 </Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                   {Math.round(current.pressure_msl)} hPa
@@ -298,7 +378,7 @@ export default class WeatherWidget extends Component {
 
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                  {t('weather.cloudCover')}:
+                  {t('weather.cloudCover', 'Cop. nuvolosa')}:
                 </Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                   {current.cloud_cover}%
@@ -308,7 +388,7 @@ export default class WeatherWidget extends Component {
               {current.precipitation > 0 && (
                 <View style={styles.detailRow}>
                   <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                    {t('weather.precipitation')}:
+                    {t('weather.precipitation', 'Precipitazioni')}:
                   </Text>
                   <Text style={[styles.detailValue, { color: theme.colors.info }]}>
                     {current.precipitation} mm
@@ -321,7 +401,7 @@ export default class WeatherWidget extends Component {
 
         <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            💨 {t('weather.wind')}
+            💨 {t('weather.wind', 'Vento')}
           </Text>
 
           <View style={styles.windInfo}>
@@ -337,7 +417,7 @@ export default class WeatherWidget extends Component {
             <View style={styles.windDetails}>
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                  {t('weather.gusts')}:
+                  {t('weather.gusts', 'Raffiche')}:
                 </Text>
                 <Text style={[styles.detailValue, { color: theme.colors.warning }]}>
                   {Math.round(current.wind_gusts_10m * 1.94384)} kt
@@ -346,7 +426,7 @@ export default class WeatherWidget extends Component {
 
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                  {t('weather.windSpeedMs')}:
+                  {t('weather.windSpeedMs', 'Velocità (m/s)')}:
                 </Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                   {current.wind_speed_10m} m/s
@@ -358,7 +438,7 @@ export default class WeatherWidget extends Component {
 
         <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            🌊 {t('weather.marine')}
+            🌊 {t('weather.marine', 'Mare')}
           </Text>
 
           {marine.wave_height !== null
@@ -369,14 +449,14 @@ export default class WeatherWidget extends Component {
                     {seaCondition.condition}
                   </Text>
                   <Text style={[styles.waveHeight, { color: theme.colors.text }]}>
-                    {t('weather.waveHeight')}: {marine.wave_height.toFixed(1)}m
+                    {t('weather.waveHeight', 'Altezza onde')}: {marine.wave_height.toFixed(1)}m
                   </Text>
                 </View>
 
                 <View style={styles.marineDetails}>
                   <View style={styles.detailRow}>
                     <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                      {t('weather.waveDirection')}:
+                      {t('weather.waveDirection', 'Direz. onde')}:
                     </Text>
                     <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                       {marine.wave_direction ? `${this.getWindDirection(marine.wave_direction)} (${marine.wave_direction}°)` : 'N/A'}
@@ -385,18 +465,18 @@ export default class WeatherWidget extends Component {
 
                   <View style={styles.detailRow}>
                     <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                      {t('weather.wavePeriod')}:
+                      {t('weather.wavePeriod', 'Periodo onde')}:
                     </Text>
                     <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                       {marine.wave_period ? `${marine.wave_period.toFixed(1)}s` : 'N/A'}
                     </Text>
                   </View>
 
-                  {marine.wind_wave_height && marine.wind_wave_height > 0 && (
+                  {marine.wind_wave_height !== null && marine.wind_wave_height > 0 && (
                     <>
                       <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                          {t('weather.windWaveHeight')}:
+                          {t('weather.windWaveHeight', 'Altezza onde vento')}:
                         </Text>
                         <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                           {marine.wind_wave_height.toFixed(1)}m
@@ -405,7 +485,7 @@ export default class WeatherWidget extends Component {
 
                       <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                          {t('weather.windWavePeriod')}:
+                          {t('weather.windWavePeriod', 'Periodo onde vento')}:
                         </Text>
                         <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                           {marine.wind_wave_period ? `${marine.wind_wave_period.toFixed(1)}s` : 'N/A'}
@@ -414,11 +494,11 @@ export default class WeatherWidget extends Component {
                     </>
                   )}
 
-                  {marine.swell_wave_height && marine.swell_wave_height > 0 && (
+                  {marine.swell_wave_height !== null && marine.swell_wave_height > 0 && (
                     <>
                       <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                          {t('weather.swellHeight')}:
+                          {t('weather.swellHeight', 'Altezza onde morte')}:
                         </Text>
                         <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                           {marine.swell_wave_height.toFixed(1)}m
@@ -427,7 +507,7 @@ export default class WeatherWidget extends Component {
 
                       <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                          {t('weather.swellPeriod')}:
+                          {t('weather.swellPeriod', 'Periodo onde morte')}:
                         </Text>
                         <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                           {marine.swell_wave_period ? `${marine.swell_wave_period.toFixed(1)}s` : 'N/A'}
@@ -436,7 +516,7 @@ export default class WeatherWidget extends Component {
 
                       <View style={styles.detailRow}>
                         <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
-                          {t('weather.swellDirection')}:
+                          {t('weather.swellDirection', 'Direz. onde morte')}:
                         </Text>
                         <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                           {marine.swell_wave_direction ? `${this.getWindDirection(marine.swell_wave_direction)} (${marine.swell_wave_direction}°)` : 'N/A'}
@@ -451,7 +531,7 @@ export default class WeatherWidget extends Component {
               <View style={styles.noDataContainer}>
                 <Text style={[styles.noDataIcon, { color: theme.colors.textMuted }]}>🏞️</Text>
                 <Text style={[styles.noDataText, { color: theme.colors.textMuted }]}>
-                  {t('weather.noMarineData')}
+                  {t('weather.noMarineData', 'Dati marini non disponibili')}
                 </Text>
               </View>
               )}
@@ -460,7 +540,7 @@ export default class WeatherWidget extends Component {
         {this.state.lastUpdate && (
           <View style={styles.updateInfo}>
             <Text style={[styles.updateText, { color: theme.colors.textMuted }]}>
-              {t('weather.lastUpdate')}: {formatTime(this.state.lastUpdate)}
+              {t('weather.lastUpdate', 'Ultimo agg.')}: {formatTime(this.state.lastUpdate)}
             </Text>
           </View>
         )}
@@ -470,7 +550,7 @@ export default class WeatherWidget extends Component {
 
   render () {
     const { theme } = this.context
-    const { loading, error, expanded } = this.state
+    const { loading, error, expanded, weatherData } = this.state
 
     return (
       <LanguageContext.Consumer>
@@ -479,20 +559,38 @@ export default class WeatherWidget extends Component {
             style={[
               styles.container,
               { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
-              expanded && styles.expandedHeight
+              expanded && weatherData && styles.expandedHeight
             ]}
             onPress={this.handleToggleExpanded}
             activeOpacity={0.8}
+            disabled={!weatherData}
           >
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
               <View style={styles.titleContainer}>
                 <Text style={[styles.title, { color: theme.colors.textSecondary }]}>
-                  {t('weather.title')}
+                  {t('weather.title', 'Meteo')}
                 </Text>
-                <Text style={[styles.expandIcon, { color: theme.colors.textMuted }]}>
-                  {expanded ? '▼' : '▶'}
-                </Text>
+                {weatherData && (
+                  <Text style={[styles.expandIcon, { color: theme.colors.textMuted }]}>
+                    {expanded ? '▼' : '▶'}
+                  </Text>
+                )}
               </View>
+            </View>
+
+            <View style={[styles.searchSection, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
+              <TextInput
+                style={[styles.searchInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                placeholder={t('weather.searchPlaceholder')}
+                placeholderTextColor={theme.colors.textMuted}
+                value={this.state.searchQuery}
+                onChangeText={this.handleSearchQueryChange}
+                onSubmitEditing={this.handleSearchSubmit}
+                returnKeyType='search'
+              />
+              <TouchableOpacity onPress={this.handleSearchSubmit} style={[styles.searchButton, { backgroundColor: theme.colors.primary }]}>
+                <Text style={[styles.searchButtonText, { color: theme.colors.card || '#FFFFFF' }]}>{t('weather.search')}</Text>
+              </TouchableOpacity>
             </View>
 
             {loading && (
@@ -504,21 +602,29 @@ export default class WeatherWidget extends Component {
               </View>
             )}
 
-            {error && (
+            {error && !loading && (
               <View style={styles.errorContainer}>
                 <Text style={[styles.errorText, { color: theme.colors.danger }]}>
                   {error}
                 </Text>
-                <TouchableOpacity onPress={this.handleFetchWeatherData} style={styles.retryButton}>
-                  <Text style={[styles.retryText, { color: theme.colors.primary }]}>
-                    {t('common.retry')}
-                  </Text>
-                </TouchableOpacity>
+                {(this.state.lastFetchLat && this.state.lastFetchLon) &&
+                  <TouchableOpacity onPress={() => this.handleFetchWeatherData(this.state.lastFetchLat, this.state.lastFetchLon)} style={styles.retryButton}>
+                    <Text style={[styles.retryText, { color: theme.colors.primary }]}>
+                      {t('common.retry', 'Riprova')}
+                    </Text>
+                  </TouchableOpacity>}
               </View>
             )}
 
-            {!loading && !error && (
+            {!loading && !error && weatherData && (
               expanded ? this.renderExpandedView(t) : this.renderCompactView(t)
+            )}
+            {!loading && !error && !weatherData && (
+              <View style={styles.noDataContainer}>
+                <Text style={[styles.noDataText, { color: theme.colors.textMuted, padding: 20 }]}>
+                  {t('weather.noDataInitial')}
+                </Text>
+              </View>
             )}
           </TouchableOpacity>
         )}
@@ -529,17 +635,45 @@ export default class WeatherWidget extends Component {
 
 const styles = StyleSheet.create({
   container: { borderRadius: 12, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
-  header: { padding: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.1)' },
+  header: { padding: 12, borderBottomWidth: 1 },
   titleContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 14, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.5 },
   expandIcon: { fontSize: 12 },
 
+  searchSection: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    alignItems: 'center'
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    marginRight: 8,
+    fontSize: 14
+  },
+  searchButton: {
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  searchButtonText: {
+    fontSize: 14,
+    fontWeight: '500'
+  },
+
   compactContainer: { padding: 12 },
-  locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, justifyContent: 'center' },
+  locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, justifyContent: 'center', flexWrap: 'wrap' },
   locationIcon: { fontSize: 16, marginRight: 6 },
-  locationText: { fontSize: 14, fontWeight: '500' },
+  locationText: { fontSize: 14, fontWeight: '500', textAlign: 'center' },
   compactRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-  compactItem: { alignItems: 'center' },
+  compactItem: { alignItems: 'center', marginHorizontal: 5 },
   compactIcon: { fontSize: 24, marginBottom: 4 },
   compactValue: { fontSize: 16, fontWeight: '600' },
   compactDirection: { fontSize: 12, marginTop: 2 },
@@ -556,14 +690,14 @@ const styles = StyleSheet.create({
   coordinates: { fontSize: 12, fontFamily: 'monospace' },
 
   currentWeather: { flexDirection: 'row' },
-  currentMain: { flex: 1, alignItems: 'center' },
+  currentMain: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   weatherIcon: { fontSize: 48, marginBottom: 8 },
   temperature: { fontSize: 32, fontWeight: '700' },
   feelsLike: { fontSize: 14, marginTop: 4 },
-  currentDetails: { flex: 1 },
+  currentDetails: { flex: 1, justifyContent: 'center' },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  detailLabel: { fontSize: 14 },
-  detailValue: { fontSize: 14, fontWeight: '500' },
+  detailLabel: { fontSize: 14, flexShrink: 1, marginRight: 4 },
+  detailValue: { fontSize: 14, fontWeight: '500', textAlign: 'right' },
 
   windInfo: { alignItems: 'center' },
   windMain: { alignItems: 'center', marginBottom: 8 },
@@ -577,13 +711,13 @@ const styles = StyleSheet.create({
   waveHeight: { fontSize: 16 },
   marineDetails: { width: '100%' },
 
-  noDataContainer: { alignItems: 'center', paddingVertical: 20 },
+  noDataContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 20 },
   noDataIcon: { fontSize: 48, marginBottom: 8 },
   noDataText: { fontSize: 16, textAlign: 'center' },
 
-  loadingContainer: { padding: 20, alignItems: 'center' },
+  loadingContainer: { padding: 20, alignItems: 'center', justifyContent: 'center', minHeight: 100 },
   loadingText: { marginTop: 8, fontSize: 14 },
-  errorContainer: { padding: 20, alignItems: 'center' },
+  errorContainer: { padding: 20, alignItems: 'center', justifyContent: 'center', minHeight: 100 },
   errorText: { fontSize: 14, textAlign: 'center', marginBottom: 8 },
   retryButton: { padding: 8 },
   retryText: { fontSize: 14, fontWeight: '500' },

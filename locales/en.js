@@ -41,7 +41,10 @@ export const en = {
     swellPeriod: 'Swell Period',
     swellDirection: 'Swell Direction',
     noMarineData: 'Marine data not available for this location',
-    lastUpdate: 'Last update'
+    lastUpdate: 'Last update',
+    search: 'Search',
+    searchPlaceholder: 'Enter a location',
+    location: 'Non-coastal location'
   },
 
   safety: {
@@ -65,7 +68,8 @@ export const en = {
       visibility: 'Visibility',
       boatStability: 'Boat Stability',
       boatCategory: 'CE Cat. Boat'
-    }
+    },
+    incompleteMarineDataError: 'You are not in a coastal location'
   },
 
   dashboard: {

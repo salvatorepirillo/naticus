@@ -1,5 +1,10 @@
+// score.js
 export function calcolaScore (barca, meteo) {
-  const ratioLD = barca.loa / barca.weight
+  // Check for critical marine parameters indicating "not at sea" or insufficient data
+  if (meteo.wave_period == null || meteo.wind_wave_height == null || meteo.wind_wave_period == null) {
+    return { errorType: 'INCOMPLETE_MARINE_DATA' }
+  }
+
   let score = 100
   const details = []
 
@@ -19,7 +24,7 @@ export function calcolaScore (barca, meteo) {
   score -= waveDeduction
   details.push({
     name: 'waveHeight',
-    value: meteo.wave_height?.toFixed(1) || 'N/A',
+    value: meteo.wave_height?.toFixed(1) || '0.0', // Default to '0.0' if N/A after checks
     unit: 'm',
     status: waveStatus,
     penalty: waveDeduction
@@ -28,17 +33,18 @@ export function calcolaScore (barca, meteo) {
   // 2. Periodo onda totale
   let periodDeduction = 0
   let periodStatus = 'good'
-  if (meteo.wave_period && meteo.wave_period < 5) {
+  // This check is now safe because meteo.wave_period is confirmed not null
+  if (meteo.wave_period < 5) {
     periodDeduction = 20
     periodStatus = 'danger'
-  } else if (meteo.wave_period && meteo.wave_period < 7) {
+  } else if (meteo.wave_period < 7) {
     periodDeduction = 10
     periodStatus = 'warning'
   }
   score -= periodDeduction
   details.push({
     name: 'wavePeriod',
-    value: meteo.wave_period?.toFixed(1) || 'N/A',
+    value: meteo.wave_period.toFixed(1), // Safe to call toFixed
     unit: 's',
     status: periodStatus,
     penalty: periodDeduction
@@ -47,14 +53,15 @@ export function calcolaScore (barca, meteo) {
   // 3. Mare del vento - altezza
   let windWaveDeduction = 0
   let windWaveStatus = 'good'
-  if (meteo.wind_wave_height && meteo.wind_wave_height > 1) {
+  // This check is now safe because meteo.wind_wave_height is confirmed not null
+  if (meteo.wind_wave_height > 1) {
     windWaveDeduction = 10
     windWaveStatus = 'warning'
   }
   score -= windWaveDeduction
   details.push({
     name: 'windWaveHeight',
-    value: meteo.wind_wave_height?.toFixed(1) || 'N/A',
+    value: meteo.wind_wave_height.toFixed(1), // Safe to call toFixed
     unit: 'm',
     status: windWaveStatus,
     penalty: windWaveDeduction
@@ -63,14 +70,15 @@ export function calcolaScore (barca, meteo) {
   // 4. Mare del vento - periodo
   let windPeriodDeduction = 0
   let windPeriodStatus = 'good'
-  if (meteo.wind_wave_period && meteo.wind_wave_period < 5) {
+  // This check is now safe because meteo.wind_wave_period is confirmed not null
+  if (meteo.wind_wave_period < 5) {
     windPeriodDeduction = 5
     windPeriodStatus = 'warning'
   }
   score -= windPeriodDeduction
   details.push({
     name: 'windWavePeriod',
-    value: meteo.wind_wave_period?.toFixed(1) || 'N/A',
+    value: meteo.wind_wave_period.toFixed(1), // Safe to call toFixed
     unit: 's',
     status: windPeriodStatus,
     penalty: windPeriodDeduction
@@ -117,7 +125,7 @@ export function calcolaScore (barca, meteo) {
   // 7. Visibilità (non disponibile in OpenMeteo, assume buona)
   details.push({
     name: 'visibility',
-    value: 'Buona',
+    value: 'Buona', // Consider making this translatable if needed
     unit: '',
     status: 'good',
     penalty: 0
@@ -126,24 +134,39 @@ export function calcolaScore (barca, meteo) {
   // 8. Stabilità barca
   let stabilityDeduction = 0
   let stabilityStatus = 'good'
-  if (ratioLD < 0.001) {
-    stabilityDeduction = 10
-    stabilityStatus = 'warning'
+  // Ensure barca.loa and barca.weight are numbers for calculation
+  if (typeof barca.loa === 'number' && typeof barca.weight === 'number' && barca.weight !== 0) {
+    const currentRatioLD = barca.loa / barca.weight
+    if (currentRatioLD < 0.001) { // Assuming ratioLD is comparable to this value
+      stabilityDeduction = 10
+      stabilityStatus = 'warning'
+    }
+    details.push({
+      name: 'boatStability',
+      value: (currentRatioLD * 1000).toFixed(2), // Example scaling for display
+      unit: '', // Define unit or context if needed
+      status: stabilityStatus,
+      penalty: stabilityDeduction
+    })
+  } else { // Handle case where boat params for stability are not valid numbers
+    details.push({
+      name: 'boatStability',
+      value: 'N/A',
+      unit: '',
+      status: 'warning', // Or 'nodata'
+      penalty: 0 // Or a default penalty if this is critical
+    })
   }
   score -= stabilityDeduction
-  details.push({
-    name: 'boatStability',
-    value: (ratioLD * 1000).toFixed(2),
-    unit: '',
-    status: stabilityStatus,
-    penalty: stabilityDeduction
-  })
 
   // 9. Categoria CE
   let categoryDeduction = 0
   let categoryStatus = 'good'
   if (barca.category === 'C' && meteo.wave_height > 2) {
     categoryDeduction = 20
+    categoryStatus = 'danger'
+  } else if (barca.category === 'D' && meteo.wave_height > 0.5) { // Example for Cat D
+    categoryDeduction = 25
     categoryStatus = 'danger'
   }
   score -= categoryDeduction

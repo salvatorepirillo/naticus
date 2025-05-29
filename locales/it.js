@@ -65,7 +65,10 @@ export const it = {
     swellPeriod: 'Periodo Frangenti',
     swellDirection: 'Direzione Frangenti',
     noMarineData: 'Dati marini non disponibili per questa posizione',
-    lastUpdate: 'Ultimo aggiornamento'
+    lastUpdate: 'Ultimo aggiornamento',
+    search: 'Cerca',
+    searchPlaceholder: 'Inserire una località',
+    location: 'Località non costiera'
   },
 
   safety: {
@@ -89,7 +92,8 @@ export const it = {
       visibility: 'Visibilità',
       boatStability: 'Stabilità Barca',
       boatCategory: 'Cat. CE Barca'
-    }
+    },
+    incompleteMarineDataError: 'Non ti trovi in una località marittima'
   },
 
   settings: {

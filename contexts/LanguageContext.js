@@ -1,4 +1,4 @@
-import React, { Component, createContext } from 'react'
+import { Component, createContext } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { translations, languageNames } from '../locales'
 

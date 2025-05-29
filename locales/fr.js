@@ -41,7 +41,10 @@ export const fr = {
     swellPeriod: 'Période de Houle',
     swellDirection: 'Direction de Houle',
     noMarineData: 'Données marines non disponibles pour cette position',
-    lastUpdate: 'Dernière mise à jour'
+    lastUpdate: 'Dernière mise à jour',
+    search: 'Recherche',
+    searchPlaceholder: 'Entrez un lieu',
+    location: 'Zone non côtière'
   },
 
   safety: {
@@ -65,7 +68,8 @@ export const fr = {
       visibility: 'Visibilité',
       boatStability: 'Stabilité Bateau',
       boatCategory: 'Cat. CE Bateau'
-    }
+    },
+    incompleteMarineDataError: 'Vous n\'êtes pas dans une zone côtière'
   },
 
   dashboard: {
