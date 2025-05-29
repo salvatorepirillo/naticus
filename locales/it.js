@@ -68,7 +68,23 @@ export const it = {
     lastUpdate: 'Ultimo aggiornamento',
     search: 'Cerca',
     searchPlaceholder: 'Inserire una località',
-    location: 'Località non costiera'
+    location: 'Località non costiera',
+
+    // Nuove traduzioni per posizioni preferite
+    favorites: 'Preferiti',
+    currentLocation: 'Posizione Attuale',
+    addToFavorites: 'Aggiungi ai Preferiti',
+    removeFromFavorites: 'Rimuovi dai Preferiti',
+    noFavorites: 'Nessuna località preferita salvata',
+    favoriteLocations: 'Località Preferite',
+    locationSaved: 'Località salvata nei preferiti',
+    locationExists: 'Questa località è già nei preferiti',
+    confirmRemove: 'Rimuovi Preferito',
+    confirmRemoveMessage: 'Vuoi rimuovere questa località dai preferiti?',
+    remove: 'Rimuovi',
+    gpsLocation: 'Posizione GPS',
+    searchedLocation: 'Località Cercata',
+    save: 'Salva'
   },
 
   safety: {
@@ -93,7 +109,8 @@ export const it = {
       boatStability: 'Stabilità Barca',
       boatCategory: 'Cat. CE Barca'
     },
-    incompleteMarineDataError: 'Non ti trovi in una località marittima'
+    incompleteMarineDataError: 'Non ti trovi in una località marittima',
+    missingBoatParamsError: 'Dati della barca mancanti: Impostazioni > Modifica parametri'
   },
 
   settings: {

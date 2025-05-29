@@ -1,8 +1,9 @@
 import { Component } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Alert, Modal, TouchableWithoutFeedback } from 'react-native'
 import * as Location from 'expo-location'
 import { ThemeContext } from '../../contexts/ThemeContext'
 import { LanguageContext } from '../../contexts/LanguageContext'
+import { storage, STORAGE_KEYS } from '../../utils/storage'
 import { formatTime } from '../../utils/helpers'
 
 export default class WeatherWidget extends Component {
@@ -20,11 +21,16 @@ export default class WeatherWidget extends Component {
       expanded: false,
       searchQuery: '',
       lastFetchLat: null,
-      lastFetchLon: null
+      lastFetchLon: null,
+      favoriteLocations: [],
+      showFavoritesModal: false,
+      isCurrentLocation: true,
+      isLocationFavorite: false
     }
   }
 
-  componentDidMount () {
+  async componentDidMount () {
+    await this.loadFavoriteLocations()
     if (this.props.latitude && this.props.longitude) {
       this.handleFetchWeatherData(this.props.latitude, this.props.longitude)
       this.weatherInterval = setInterval(() => this.handleFetchWeatherData(this.props.latitude, this.props.longitude), 30 * 60 * 1000)
@@ -37,7 +43,39 @@ export default class WeatherWidget extends Component {
     }
   }
 
-  getCurrentLocation = async () => {
+  loadFavoriteLocations = async () => {
+    try {
+      const favorites = await storage.get(STORAGE_KEYS.FAVORITES_STORAGE_KEY, [])
+      this.setState({ favoriteLocations: favorites }, this.checkIfCurrentLocationIsFavorite)
+    } catch (error) {
+      console.warn('Error loading favorite locations:', error)
+    }
+  }
+
+  saveFavoriteLocations = async (favorites) => {
+    try {
+      await storage.set(STORAGE_KEYS.FAVORITES_STORAGE_KEY, favorites)
+      this.setState({ favoriteLocations: favorites }, this.checkIfCurrentLocationIsFavorite)
+    } catch (error) {
+      console.warn('Error saving favorite locations:', error)
+    }
+  }
+
+  checkIfCurrentLocationIsFavorite = () => {
+    const { locationData, favoriteLocations } = this.state
+    if (!locationData) {
+      this.setState({ isLocationFavorite: false })
+      return
+    }
+
+    const isFavorite = favoriteLocations.some(fav =>
+      Math.abs(fav.latitude - locationData.latitude) < 0.001 &&
+      Math.abs(fav.longitude - locationData.longitude) < 0.001
+    )
+    this.setState({ isLocationFavorite: isFavorite })
+  }
+
+  handleGetCurrentLocation = async () => {
     this.setState({ loading: true, error: null })
 
     try {
@@ -58,6 +96,7 @@ export default class WeatherWidget extends Component {
         clearInterval(this.weatherInterval)
       }
 
+      this.setState({ isCurrentLocation: true })
       await this.handleFetchWeatherData(lat, lon)
 
       this.weatherInterval = setInterval(() => this.handleFetchWeatherData(lat, lon), 30 * 60 * 1000)
@@ -121,6 +160,7 @@ export default class WeatherWidget extends Component {
         longitude
       }
 
+      this.setState({ isCurrentLocation: false })
       await this.handleFetchWeatherData(latitude, longitude, initialLocationDetails)
 
       this.weatherInterval = setInterval(() => this.handleFetchWeatherData(latitude, longitude), 30 * 60 * 1000)
@@ -132,6 +172,74 @@ export default class WeatherWidget extends Component {
         this.props.onWeatherUpdate(null, null)
       }
     }
+  }
+
+  handleSelectFavorite = async (favorite) => {
+    if (this.weatherInterval) {
+      clearInterval(this.weatherInterval)
+    }
+
+    this.setState({
+      showFavoritesModal: false,
+      isCurrentLocation: false
+    })
+
+    await this.handleFetchWeatherData(favorite.latitude, favorite.longitude, favorite)
+    this.weatherInterval = setInterval(() => this.handleFetchWeatherData(favorite.latitude, favorite.longitude), 30 * 60 * 1000)
+  }
+
+  handleToggleFavorite = () => {
+    const { locationData, favoriteLocations, isLocationFavorite } = this.state
+
+    if (!locationData) {
+      Alert.alert('Errore', 'Nessuna località da salvare')
+      return
+    }
+
+    if (isLocationFavorite) {
+      // Rimuovi dai preferiti
+      const updatedFavorites = favoriteLocations.filter(fav =>
+        !(Math.abs(fav.latitude - locationData.latitude) < 0.001 &&
+          Math.abs(fav.longitude - locationData.longitude) < 0.001)
+      )
+      this.saveFavoriteLocations(updatedFavorites)
+    } else {
+      // Aggiungi ai preferiti
+      const locationName = locationData.city || locationData.locality || locationData.principalSubdivision || 'Località sconosciuta'
+
+      const newFavorite = {
+        id: Date.now().toString(),
+        name: locationName,
+        city: locationData.city,
+        locality: locationData.locality,
+        principalSubdivision: locationData.principalSubdivision,
+        countryName: locationData.countryName,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        addedAt: new Date().toISOString()
+      }
+
+      const updatedFavorites = [...favoriteLocations, newFavorite]
+      this.saveFavoriteLocations(updatedFavorites)
+    }
+  }
+
+  handleRemoveFavorite = (favoriteId) => {
+    Alert.alert(
+      'Rimuovi Preferito',
+      'Vuoi rimuovere questa località dai preferiti?',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Rimuovi',
+          style: 'destructive',
+          onPress: () => {
+            const updatedFavorites = this.state.favoriteLocations.filter(fav => fav.id !== favoriteId)
+            this.saveFavoriteLocations(updatedFavorites)
+          }
+        }
+      ]
+    )
   }
 
   handleFetchWeatherData = async (lat, lon, initialLocationDetails = null) => {
@@ -147,7 +255,7 @@ export default class WeatherWidget extends Component {
     if (initialLocationDetails) {
       stateUpdate.locationData = initialLocationDetails
     } else {
-      stateUpdate.locationData = null // Clear previous location data if not providing new initial
+      stateUpdate.locationData = null
     }
     this.setState(stateUpdate)
 
@@ -190,7 +298,7 @@ export default class WeatherWidget extends Component {
         loading: false,
         lastUpdate: new Date(),
         error: null
-      })
+      }, this.checkIfCurrentLocationIsFavorite)
 
       if (this.props.onWeatherUpdate) {
         this.props.onWeatherUpdate(weatherData, marineData)
@@ -251,9 +359,72 @@ export default class WeatherWidget extends Component {
     this.setState({ expanded: !this.state.expanded })
   }
 
+  renderFavoritesModal = (t) => {
+    const { theme } = this.context
+    const { favoriteLocations, showFavoritesModal } = this.state
+
+    return (
+      <Modal
+        animationType='fade'
+        transparent
+        visible={showFavoritesModal}
+        onRequestClose={() => this.setState({ showFavoritesModal: false })}
+      >
+        <TouchableWithoutFeedback onPress={() => this.setState({ showFavoritesModal: false })}>
+          <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                    Località Preferite
+                  </Text>
+                  <TouchableOpacity onPress={() => this.setState({ showFavoritesModal: false })}>
+                    <Text style={[styles.closeButton, { color: theme.colors.textMuted }]}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.favoritesList}>
+                  {favoriteLocations.length === 0
+                    ? (
+                      <Text style={[styles.noFavoritesText, { color: theme.colors.textMuted }]}>
+                        Nessuna località preferita salvata
+                      </Text>
+                      )
+                    : (
+                        favoriteLocations.map(favorite => (
+                          <View key={favorite.id} style={[styles.favoriteItem, { borderBottomColor: theme.colors.separator }]}>
+                            <TouchableOpacity
+                              style={styles.favoriteContent}
+                              onPress={() => this.handleSelectFavorite(favorite)}
+                            >
+                              <Text style={[styles.favoriteName, { color: theme.colors.text }]}>
+                                {favorite.name}
+                              </Text>
+                              <Text style={[styles.favoriteDetails, { color: theme.colors.textSecondary }]}>
+                                {favorite.countryName}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.removeButton}
+                              onPress={() => this.handleRemoveFavorite(favorite.id)}
+                            >
+                              <Text style={[styles.removeButtonText, { color: theme.colors.danger }]}>🗑️</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))
+                      )}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    )
+  }
+
   renderCompactView = (t) => {
     const { theme } = this.context
-    const { weatherData, marineData, locationData } = this.state
+    const { weatherData, marineData, locationData, isCurrentLocation, isLocationFavorite } = this.state
 
     if (!weatherData || !marineData) return null
 
@@ -265,11 +436,22 @@ export default class WeatherWidget extends Component {
       <View style={styles.compactContainer}>
         {locationData && (
           <View style={styles.locationContainer}>
-            <Text style={[styles.locationIcon, { color: theme.colors.primary }]}>📍</Text>
-            <Text style={[styles.locationText, { color: theme.colors.textSecondary }]}>
-              {locationData.city || locationData.locality || locationData.principalSubdivision}
-              {locationData.countryName && `, ${locationData.countryName}`}
-            </Text>
+            <View style={styles.locationInfo}>
+              <Text style={[styles.locationIcon, { color: theme.colors.primary }]}>
+                {isCurrentLocation ? '📍' : '🌍'}
+              </Text>
+              <Text style={[styles.locationText, { color: theme.colors.textSecondary }]}>
+                {locationData.city || locationData.locality || locationData.principalSubdivision}
+                {locationData.countryName && `, ${locationData.countryName}`}
+              </Text>
+            </View>
+            {!isCurrentLocation && (
+              <TouchableOpacity onPress={this.handleToggleFavorite} style={styles.favoriteButton}>
+                <Text style={[styles.favoriteIcon, { color: isLocationFavorite ? theme.colors.warning : theme.colors.textMuted }]}>
+                  {isLocationFavorite ? '⭐' : '☆'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -308,7 +490,7 @@ export default class WeatherWidget extends Component {
 
   renderExpandedView = (t) => {
     const { theme } = this.context
-    const { weatherData, marineData, locationData } = this.state
+    const { weatherData, marineData, locationData, isCurrentLocation, isLocationFavorite } = this.state
 
     if (!weatherData || !marineData) return null
 
@@ -321,11 +503,22 @@ export default class WeatherWidget extends Component {
         {locationData && (
           <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
             <View style={styles.locationHeader}>
-              <Text style={[styles.locationIcon, { color: theme.colors.primary }]}>📍</Text>
+              <Text style={[styles.locationIcon, { color: theme.colors.primary }]}>
+                {isCurrentLocation ? '📍' : '🌍'}
+              </Text>
               <View style={styles.locationInfo}>
-                <Text style={[styles.locationPrimary, { color: theme.colors.text }]}>
-                  {locationData.city || locationData.locality || locationData.principalSubdivision}
-                </Text>
+                <View style={styles.locationTitleRow}>
+                  <Text style={[styles.locationPrimary, { color: theme.colors.text }]}>
+                    {locationData.city || locationData.locality || locationData.principalSubdivision}
+                  </Text>
+                  {!isCurrentLocation && (
+                    <TouchableOpacity onPress={this.handleToggleFavorite} style={styles.favoriteButton}>
+                      <Text style={[styles.favoriteIcon, { color: isLocationFavorite ? theme.colors.warning : theme.colors.textMuted }]}>
+                        {isLocationFavorite ? '⭐' : '☆'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <Text style={[styles.locationSecondary, { color: theme.colors.textSecondary }]}>
                   {locationData.principalSubdivision !== (locationData.city || locationData.locality) &&
                     locationData.principalSubdivision && `${locationData.principalSubdivision}, `}
@@ -550,83 +743,104 @@ export default class WeatherWidget extends Component {
 
   render () {
     const { theme } = this.context
-    const { loading, error, expanded, weatherData } = this.state
+    const { loading, error, expanded, weatherData, favoriteLocations } = this.state
 
     return (
       <LanguageContext.Consumer>
         {({ t }) => (
-          <TouchableOpacity
-            style={[
-              styles.container,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
-              expanded && weatherData && styles.expandedHeight
-            ]}
-            onPress={this.handleToggleExpanded}
-            activeOpacity={0.8}
-            disabled={!weatherData}
-          >
-            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-              <View style={styles.titleContainer}>
-                <Text style={[styles.title, { color: theme.colors.textSecondary }]}>
-                  {t('weather.title', 'Meteo')}
-                </Text>
-                {weatherData && (
-                  <Text style={[styles.expandIcon, { color: theme.colors.textMuted }]}>
-                    {expanded ? '▼' : '▶'}
+          <View>
+            <TouchableOpacity
+              style={[
+                styles.container,
+                { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+                expanded && weatherData && styles.expandedHeight
+              ]}
+              onPress={this.handleToggleExpanded}
+              activeOpacity={0.8}
+              disabled={!weatherData}
+            >
+              <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+                <View style={styles.titleContainer}>
+                  <Text style={[styles.title, { color: theme.colors.textSecondary }]}>
+                    {t('weather.title', 'Meteo')}
                   </Text>
-                )}
+                  <View style={styles.headerButtons}>
+                    {favoriteLocations.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => this.setState({ showFavoritesModal: true })}
+                        style={styles.headerButton}
+                      >
+                        <Text style={[styles.headerButtonText, { color: theme.colors.primary }]}>⭐</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      onPress={this.handleGetCurrentLocation}
+                      style={styles.headerButton}
+                      disabled={loading}
+                    >
+                      <Text style={[styles.headerButtonText, { color: theme.colors.primary }]}>📍</Text>
+                    </TouchableOpacity>
+                    {weatherData && (
+                      <Text style={[styles.expandIcon, { color: theme.colors.textMuted }]}>
+                        {expanded ? '▼' : '▶'}
+                      </Text>
+                    )}
+                  </View>
+                </View>
               </View>
-            </View>
 
-            <View style={[styles.searchSection, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
-              <TextInput
-                style={[styles.searchInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-                placeholder={t('weather.searchPlaceholder')}
-                placeholderTextColor={theme.colors.textMuted}
-                value={this.state.searchQuery}
-                onChangeText={this.handleSearchQueryChange}
-                onSubmitEditing={this.handleSearchSubmit}
-                returnKeyType='search'
-              />
-              <TouchableOpacity onPress={this.handleSearchSubmit} style={[styles.searchButton, { backgroundColor: theme.colors.primary }]}>
-                <Text style={[styles.searchButtonText, { color: theme.colors.card || '#FFFFFF' }]}>{t('weather.search')}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loading && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size='small' color={theme.colors.primary} />
-                <Text style={[styles.loadingText, { color: theme.colors.textMuted }]}>
-                  {t('weather.loading')}
-                </Text>
+              <View style={[styles.searchSection, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
+                <TextInput
+                  style={[styles.searchInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                  placeholder={t('weather.searchPlaceholder')}
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={this.state.searchQuery}
+                  onChangeText={this.handleSearchQueryChange}
+                  onSubmitEditing={this.handleSearchSubmit}
+                  returnKeyType='search'
+                />
+                <TouchableOpacity onPress={this.handleSearchSubmit} style={[styles.searchButton, { backgroundColor: theme.colors.primary }]}>
+                  <Text style={[styles.searchButtonText, { color: theme.colors.card || '#FFFFFF' }]}>{t('weather.search')}</Text>
+                </TouchableOpacity>
               </View>
-            )}
 
-            {error && !loading && (
-              <View style={styles.errorContainer}>
-                <Text style={[styles.errorText, { color: theme.colors.danger }]}>
-                  {error}
-                </Text>
-                {(this.state.lastFetchLat && this.state.lastFetchLon) &&
-                  <TouchableOpacity onPress={() => this.handleFetchWeatherData(this.state.lastFetchLat, this.state.lastFetchLon)} style={styles.retryButton}>
-                    <Text style={[styles.retryText, { color: theme.colors.primary }]}>
-                      {t('common.retry', 'Riprova')}
-                    </Text>
-                  </TouchableOpacity>}
-              </View>
-            )}
+              {loading && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size='small' color={theme.colors.primary} />
+                  <Text style={[styles.loadingText, { color: theme.colors.textMuted }]}>
+                    {t('weather.loading')}
+                  </Text>
+                </View>
+              )}
 
-            {!loading && !error && weatherData && (
-              expanded ? this.renderExpandedView(t) : this.renderCompactView(t)
-            )}
-            {!loading && !error && !weatherData && (
-              <View style={styles.noDataContainer}>
-                <Text style={[styles.noDataText, { color: theme.colors.textMuted, padding: 20 }]}>
-                  {t('weather.noDataInitial')}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+              {error && !loading && (
+                <View style={styles.errorContainer}>
+                  <Text style={[styles.errorText, { color: theme.colors.danger }]}>
+                    {error}
+                  </Text>
+                  {(this.state.lastFetchLat && this.state.lastFetchLon) &&
+                    <TouchableOpacity onPress={() => this.handleFetchWeatherData(this.state.lastFetchLat, this.state.lastFetchLon)} style={styles.retryButton}>
+                      <Text style={[styles.retryText, { color: theme.colors.primary }]}>
+                        {t('common.retry', 'Riprova')}
+                      </Text>
+                    </TouchableOpacity>}
+                </View>
+              )}
+
+              {!loading && !error && weatherData && (
+                expanded ? this.renderExpandedView(t) : this.renderCompactView(t)
+              )}
+              {!loading && !error && !weatherData && (
+                <View style={styles.noDataContainer}>
+                  <Text style={[styles.noDataText, { color: theme.colors.textMuted, padding: 20 }]}>
+                    {t('weather.noDataInitial')}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {this.renderFavoritesModal(t)}
+          </View>
         )}
       </LanguageContext.Consumer>
     )
@@ -638,7 +852,10 @@ const styles = StyleSheet.create({
   header: { padding: 12, borderBottomWidth: 1 },
   titleContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 14, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.5 },
-  expandIcon: { fontSize: 12 },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerButton: { padding: 4 },
+  headerButtonText: { fontSize: 16 },
+  expandIcon: { fontSize: 12, marginLeft: 4 },
 
   searchSection: {
     flexDirection: 'row',
@@ -668,10 +885,87 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
 
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  modalContent: {
+    borderRadius: 16,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '70%',
+    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA'
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600'
+  },
+  closeButton: {
+    fontSize: 20,
+    padding: 4
+  },
+  favoritesList: {
+    maxHeight: 300,
+    padding: 8
+  },
+  favoriteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1
+  },
+  favoriteContent: {
+    flex: 1
+  },
+  favoriteName: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 2
+  },
+  favoriteDetails: {
+    fontSize: 14
+  },
+  removeButton: {
+    padding: 8
+  },
+  removeButtonText: {
+    fontSize: 16
+  },
+  noFavoritesText: {
+    fontSize: 14,
+    textAlign: 'center',
+    padding: 40
+  },
+
   compactContainer: { padding: 12 },
-  locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, justifyContent: 'center', flexWrap: 'wrap' },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1
+  },
   locationIcon: { fontSize: 16, marginRight: 6 },
-  locationText: { fontSize: 14, fontWeight: '500', textAlign: 'center' },
+  locationText: { fontSize: 14, fontWeight: '500', flex: 1 },
+  favoriteButton: { padding: 4 },
+  favoriteIcon: { fontSize: 20 },
   compactRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
   compactItem: { alignItems: 'center', marginHorizontal: 5 },
   compactIcon: { fontSize: 24, marginBottom: 4 },
@@ -684,8 +978,13 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12 },
 
   locationHeader: { flexDirection: 'row', alignItems: 'flex-start' },
-  locationInfo: { flex: 1 },
-  locationPrimary: { fontSize: 18, fontWeight: '600', marginBottom: 2 },
+  locationTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%'
+  },
+  locationPrimary: { fontSize: 18, fontWeight: '600', marginBottom: 2, flex: 1 },
   locationSecondary: { fontSize: 14, marginBottom: 4 },
   coordinates: { fontSize: 12, fontFamily: 'monospace' },
 

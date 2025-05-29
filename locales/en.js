@@ -44,7 +44,23 @@ export const en = {
     lastUpdate: 'Last update',
     search: 'Search',
     searchPlaceholder: 'Enter a location',
-    location: 'Non-coastal location'
+    location: 'Non-coastal location',
+
+    // Nuove traduzioni per posizioni preferite
+    favorites: 'Favorites',
+    currentLocation: 'Current Location',
+    addToFavorites: 'Add to Favorites',
+    removeFromFavorites: 'Remove from Favorites',
+    noFavorites: 'No favorite locations saved',
+    favoriteLocations: 'Favorite Locations',
+    locationSaved: 'Location saved to favorites',
+    locationExists: 'This location is already in favorites',
+    confirmRemove: 'Remove Favorite',
+    confirmRemoveMessage: 'Do you want to remove this location from favorites?',
+    remove: 'Remove',
+    gpsLocation: 'GPS Location',
+    searchedLocation: 'Searched Location',
+    save: 'Save'
   },
 
   safety: {
@@ -69,7 +85,8 @@ export const en = {
       boatStability: 'Boat Stability',
       boatCategory: 'CE Cat. Boat'
     },
-    incompleteMarineDataError: 'You are not in a coastal location'
+    incompleteMarineDataError: 'You are not in a coastal location',
+    missingBoatParamsError: 'Missing boat data: Settings > Edit parameters'
   },
 
   dashboard: {

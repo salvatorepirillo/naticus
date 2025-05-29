@@ -44,7 +44,23 @@ export const fr = {
     lastUpdate: 'Dernière mise à jour',
     search: 'Recherche',
     searchPlaceholder: 'Entrez un lieu',
-    location: 'Zone non côtière'
+    location: 'Zone non côtière',
+
+    // Nuove traduzioni per posizioni preferite
+    favorites: 'Favoris',
+    currentLocation: 'Position Actuelle',
+    addToFavorites: 'Ajouter aux Favoris',
+    removeFromFavorites: 'Retirer des Favoris',
+    noFavorites: 'Aucun lieu favori enregistré',
+    favoriteLocations: 'Lieux Favoris',
+    locationSaved: 'Lieu enregistré dans les favoris',
+    locationExists: 'Ce lieu est déjà dans les favoris',
+    confirmRemove: 'Retirer Favori',
+    confirmRemoveMessage: 'Voulez-vous retirer ce lieu des favoris?',
+    remove: 'Retirer',
+    gpsLocation: 'Position GPS',
+    searchedLocation: 'Lieu Recherché',
+    save: 'Enregistrer'
   },
 
   safety: {
@@ -69,7 +85,8 @@ export const fr = {
       boatStability: 'Stabilité Bateau',
       boatCategory: 'Cat. CE Bateau'
     },
-    incompleteMarineDataError: 'Vous n\'êtes pas dans une zone côtière'
+    incompleteMarineDataError: 'Vous n\'êtes pas dans une zone côtière',
+    missingBoatParamsError: 'Données du bateau manquantes : Paramètres > Modifier les paramètres'
   },
 
   dashboard: {

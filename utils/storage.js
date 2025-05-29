@@ -1,3 +1,4 @@
+// utils/storage.js - Aggiornato con nuove chiavi
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const STORAGE_KEYS = {
@@ -10,7 +11,8 @@ const STORAGE_KEYS = {
   OFFLINE_REGIONS: 'offline_regions',
   OFFLINE_MODE: 'offline_mode',
   MAP_CACHE_SIZE: 'map_cache_size',
-  TILE_CACHE_INFO: 'tile_cache_info'
+  TILE_CACHE_INFO: 'tile_cache_info',
+  WEATHER_FAVORITE_LOCATIONS: 'weather_favorite_locations' // Nuova chiave
 }
 
 export const storage = {
