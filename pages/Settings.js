@@ -10,6 +10,7 @@ import LanguageSelector from '../components/settings/LanguageSelector'
 import PinSetup from '../components/settings/PinSetup'
 import BiometricAuth from '../components/settings/BiometricAuth'
 import BoatParameters from '../components/settings/BoatParameters'
+import packageJson from '../package.json'
 
 export default class Settings extends Component {
   static contextType = ThemeContext
@@ -98,7 +99,7 @@ export default class Settings extends Component {
               <View style={[styles.section, styles.aboutSection, { backgroundColor: theme.colors.surface }]}>
                 <SettingsRow
                   title={t('settings.about')}
-                  subtitle={t('settings.version', { version: '1.0.0' })}
+                  subtitle={t('settings.version', { version: packageJson.version })}
                 />
               </View>
             </ScrollView>
