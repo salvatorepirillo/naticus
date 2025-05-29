@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { ThemeProvider, ThemeContext } from './contexts/ThemeContext'
 import { LanguageProvider, LanguageContext } from './contexts/LanguageContext'
 import { LoadingProvider } from './contexts/LoadingContext'
-import { Dashboard, Settings } from './pages'
+import { Dashboard, Maps, Settings } from './pages'
 import { Text } from 'react-native'
 
 const Tab = createBottomTabNavigator()
@@ -29,6 +29,7 @@ class AppContent extends Component {
               }}
             >
               <Tab.Screen name='Dashboard' component={Dashboard} options={{ tabBarLabel: t('navigation.dashboard'), tabBarIcon: () => <Text>📊</Text> }} />
+              <Tab.Screen name='Maps' component={Maps} options={{ tabBarLabel: t('navigation.maps'), tabBarIcon: () => <Text>🗺️</Text> }} />
               <Tab.Screen name='Settings' component={Settings} options={{ tabBarLabel: t('navigation.settings'), tabBarIcon: () => <Text>⚙️</Text> }} />
             </Tab.Navigator>
           </NavigationContainer>

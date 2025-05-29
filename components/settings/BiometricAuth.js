@@ -132,17 +132,10 @@ export default class BiometricAuth extends Component {
                 <Text style={[styles.title, { color: theme.colors.text }]}>
                   {this.getBiometricLabel(t)}
                 </Text>
-                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                  {isEnabled ? t('settings.biometricEnabled') : t('settings.biometricDisabled')}
-                </Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>{isEnabled ? t('settings.biometricEnabled') : t('settings.biometricDisabled')}</Text>
               </View>
             </View>
-            <Button
-              title={isEnabled ? t('common.disable') : t('common.enable')}
-              onPress={this.handleToggleBiometric}
-              variant={isEnabled ? 'secondary' : 'primary'}
-              size='small'
-            />
+            <Button title={isEnabled ? t('common.disable') : t('common.enable')} onPress={this.handleToggleBiometric} variant={isEnabled ? 'secondary' : 'primary'} size='small' />
           </View>
         )}
       </LanguageContext.Consumer>

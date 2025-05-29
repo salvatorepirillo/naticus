@@ -54,7 +54,7 @@ export const en = {
     usePinInstead: 'Use PIN instead',
     about: 'About',
     version: 'Version {{version}}',
-    
+
     // Boat parameters
     boatParameters: 'Boat Parameters',
     boatParametersDescription: 'Configure your vessel data',

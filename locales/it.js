@@ -25,6 +25,23 @@ export const it = {
     lastUpdate: 'Ultimo aggiornamento: {{time}}'
   },
 
+  maps: {
+    title: 'Carte Nautiche',
+    subtitle: 'Navigazione e cartografia marittima',
+    onlineMode: 'Modalità Online',
+    offlineMode: 'Modalità Offline',
+    downloadRegion: 'Scarica Regione',
+    downloadProgress: 'Download in corso: {{progress}}%',
+    downloadComplete: 'Download completato',
+    downloadError: 'Errore durante il download',
+    noOfflineData: 'Nessuna carta offline disponibile',
+    disclaimer: 'Le carte mostrate non sostituiscono le carte nautiche ufficiali',
+    regionSaved: 'Regione salvata per uso offline',
+    storage: 'Spazio utilizzato: {{size}}',
+    clearCache: 'Pulisci Cache',
+    manageMaps: 'Gestisci Mappe'
+  },
+
   settings: {
     title: 'Impostazioni',
     language: 'Lingua',
@@ -54,7 +71,7 @@ export const it = {
     usePinInstead: 'Usa PIN invece',
     about: 'Informazioni',
     version: 'Versione {{version}}',
-    
+
     // Parametri barca
     boatParameters: 'Parametri Barca',
     boatParametersDescription: 'Configura i dati della tua imbarcazione',

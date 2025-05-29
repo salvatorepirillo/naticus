@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { View, Text, StyleSheet, TextInput, Modal, TouchableOpacity, TouchableWithoutFeedback, Alert, Image } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { ThemeContext } from '../../contexts/ThemeContext'
@@ -154,30 +154,17 @@ export default class BoatParameters extends Component {
     const { theme } = this.context
 
     return (
-      <Modal
-        animationType='fade'
-        transparent
-        visible={this.state.showCategoryModal}
-        onRequestClose={() => this.setState({ showCategoryModal: false })}
-      >
+      <Modal animationType='fade' transparent visible={this.state.showCategoryModal} onRequestClose={() => this.setState({ showCategoryModal: false })}>
         <TouchableWithoutFeedback onPress={() => this.setState({ showCategoryModal: false })}>
           <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
             <TouchableWithoutFeedback>
               <View style={[styles.selectorModalContent, { backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.selectorTitle, { color: theme.colors.text }]}>
-                  {t('settings.selectCategory')}
-                </Text>
-                {BOAT_CATEGORIES.map(category => (
-                  <TouchableOpacity
-                    key={category}
-                    style={[styles.selectorOption, category === this.state.category && { backgroundColor: theme.colors.primary + '20' }]}
-                    onPress={() => this.selectCategory(category)}
-                  >
-                    <Text style={[styles.selectorOptionText, { color: category === this.state.category ? theme.colors.primary : theme.colors.text }]}>
-                      {t(`settings.category${category}`)}
-                    </Text>
+                <Text style={[styles.selectorTitle, { color: theme.colors.text }]}>{t('settings.selectCategory')}</Text>
+                {BOAT_CATEGORIES.map(category =>
+                  <TouchableOpacity key={category} style={[styles.selectorOption, category === this.state.category && { backgroundColor: theme.colors.primary + '20' }]} onPress={() => this.selectCategory(category)}>
+                    <Text style={[styles.selectorOptionText, { color: category === this.state.category ? theme.colors.primary : theme.colors.text }]}>{t(`settings.category${category}`)}</Text>
                   </TouchableOpacity>
-                ))}
+                )}
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -190,35 +177,15 @@ export default class BoatParameters extends Component {
     const { theme } = this.context
 
     return (
-      <Modal
-        animationType='fade'
-        transparent
-        visible={this.state.showHullTypeModal}
-        onRequestClose={() => this.setState({ showHullTypeModal: false })}
-      >
+      <Modal animationType='fade' transparent visible={this.state.showHullTypeModal} onRequestClose={() => this.setState({ showHullTypeModal: false })}>
         <TouchableWithoutFeedback onPress={() => this.setState({ showHullTypeModal: false })}>
           <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
             <TouchableWithoutFeedback>
               <View style={[styles.selectorModalContent, { backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.selectorTitle, { color: theme.colors.text }]}>
-                  {t('settings.selectHullType')}
-                </Text>
+                <Text style={[styles.selectorTitle, { color: theme.colors.text }]}>{t('settings.selectHullType')}</Text>
                 {HULL_TYPES.map(hullType => (
-                  <TouchableOpacity
-                    key={hullType}
-                    style={[
-                      styles.selectorOption,
-                      hullType === this.state.hullType && { backgroundColor: theme.colors.primary + '20' }
-                    ]}
-                    onPress={() => this.selectHullType(hullType)}
-                  >
-                    <Text style={[
-                      styles.selectorOptionText,
-                      { color: hullType === this.state.hullType ? theme.colors.primary : theme.colors.text }
-                    ]}
-                    >
-                      {t(`settings.hullType${hullType.charAt(0).toUpperCase() + hullType.slice(1).replace('-', '')}`)}
-                    </Text>
+                  <TouchableOpacity key={hullType} style={[styles.selectorOption, hullType === this.state.hullType && { backgroundColor: theme.colors.primary + '20' }]} onPress={() => this.selectHullType(hullType)}>
+                    <Text style={[styles.selectorOptionText, { color: hullType === this.state.hullType ? theme.colors.primary : theme.colors.text }]}>{t(`settings.hullType${hullType.charAt(0).toUpperCase() + hullType.slice(1).replace('-', '')}`)}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -236,30 +203,16 @@ export default class BoatParameters extends Component {
       <LanguageContext.Consumer>
         {({ t }) => (
           <View>
-            <Button
-              title={t('settings.editBoatParameters')}
-              onPress={this.handleShowModal}
-              variant='outline'
-              size='small'
-            />
+            <Button title={t('settings.editBoatParameters')} onPress={this.handleShowModal} variant='outline' size='small' />
 
-            <Modal
-              animationType='slide'
-              transparent
-              visible={this.state.modalVisible}
-              onRequestClose={this.handleHideModal}
-              statusBarTranslucent
-            >
+            <Modal animationType='slide' transparent visible={this.state.modalVisible} onRequestClose={this.handleHideModal} statusBarTranslucent>
               <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
                 <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
                   <View style={styles.header}>
-                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-                      {t('settings.boatParameters')}
-                    </Text>
+                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('settings.boatParameters')}</Text>
                   </View>
 
                   <View style={styles.content}>
-                    {/* Foto barca */}
                     <View style={styles.photoSection}>
                       <Text style={[styles.label, { color: theme.colors.text }]}>{t('settings.boatPhoto')}</Text>
                       <View style={styles.photoContainer}>
@@ -355,24 +308,14 @@ export default class BoatParameters extends Component {
                       <View style={styles.rowContainer}>
                         <View style={styles.halfWidth}>
                           <Text style={[styles.label, { color: theme.colors.text }]}>{t('settings.category')}</Text>
-                          <TouchableOpacity
-                            style={[styles.selector, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-                            onPress={() => this.setState({ showCategoryModal: true })}
-                          >
-                            <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                              {t(`settings.category${this.state.category}`)}
-                            </Text>
+                          <TouchableOpacity style={[styles.selector, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]} onPress={() => this.setState({ showCategoryModal: true })}>
+                            <Text style={[styles.selectorText, { color: theme.colors.text }]}>{t(`settings.category${this.state.category}`)}</Text>
                           </TouchableOpacity>
                         </View>
                         <View style={styles.halfWidth}>
                           <Text style={[styles.label, { color: theme.colors.text }]}>{t('settings.hullType')}</Text>
-                          <TouchableOpacity
-                            style={[styles.selector, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-                            onPress={() => this.setState({ showHullTypeModal: true })}
-                          >
-                            <Text style={[styles.selectorText, { color: theme.colors.text }]}>
-                              {t(`settings.hullType${this.state.hullType.charAt(0).toUpperCase() + this.state.hullType.slice(1).replace('-', '')}`)}
-                            </Text>
+                          <TouchableOpacity style={[styles.selector, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]} onPress={() => this.setState({ showHullTypeModal: true })}>
+                            <Text style={[styles.selectorText, { color: theme.colors.text }]}>{t(`settings.hullType${this.state.hullType.charAt(0).toUpperCase() + this.state.hullType.slice(1).replace('-', '')}`)}</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -395,25 +338,11 @@ export default class BoatParameters extends Component {
                   </View>
 
                   <View style={styles.footer}>
-                    <Button
-                      title={t('common.cancel')}
-                      onPress={this.handleHideModal}
-                      variant='secondary'
-                      size='medium'
-                      style={styles.footerButton}
-                    />
-                    <Button
-                      title={t('common.save')}
-                      onPress={this.handleSaveBoatParameters}
-                      variant='primary'
-                      size='medium'
-                      disabled={this.state.isLoading}
-                      style={styles.footerButton}
-                    />
+                    <Button title={t('common.cancel')} onPress={this.handleHideModal} variant='secondary' size='medium' style={styles.footerButton} />
+                    <Button title={t('common.save')} onPress={this.handleSaveBoatParameters} variant='primary' size='medium' disabled={this.state.isLoading} style={styles.footerButton} />
                   </View>
                 </View>
               </View>
-
               {this.renderCategoryModal(t)}
               {this.renderHullTypeModal(t)}
             </Modal>

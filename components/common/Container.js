@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { View, StyleSheet, SafeAreaView } from 'react-native'
 import { ThemeContext } from '../../contexts/ThemeContext'
 

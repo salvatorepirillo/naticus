@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback } from 'react-native'
 import { ThemeContext } from '../../contexts/ThemeContext'
 import { LanguageContext } from '../../contexts/LanguageContext'

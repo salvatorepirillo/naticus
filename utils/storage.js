@@ -6,7 +6,11 @@ const STORAGE_KEYS = {
   USER_SETTINGS: 'userSettings',
   PIN: 'pin',
   BIOMETRIC_ENABLED: 'biometric_enabled',
-  BOAT_PARAMETERS: 'boat_parameters'
+  BOAT_PARAMETERS: 'boat_parameters',
+  OFFLINE_REGIONS: 'offline_regions',
+  OFFLINE_MODE: 'offline_mode',
+  MAP_CACHE_SIZE: 'map_cache_size',
+  TILE_CACHE_INFO: 'tile_cache_info'
 }
 
 export const storage = {

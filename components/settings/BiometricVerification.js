@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback } from 'react-native'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { ThemeContext } from '../../contexts/ThemeContext'
@@ -44,12 +44,7 @@ export default class BiometricVerification extends Component {
     }
 
     try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: this.props.title || 'Autentica per continuare',
-        cancelLabel: 'Annulla',
-        fallbackLabel: 'Usa PIN'
-      })
-
+      const result = await LocalAuthentication.authenticateAsync({ promptMessage: this.props.title || 'Autentica per continuare', cancelLabel: 'Annulla', fallbackLabel: 'Usa PIN' })
       if (result.success) {
         this.props.onSuccess?.()
       } else if (result.error === 'user_fallback') {
@@ -88,55 +83,27 @@ export default class BiometricVerification extends Component {
 
     if (showPinFallback) {
       return (
-        <PinVerification
-          visible={visible}
-          title={title}
-          onSuccess={this.handlePinSuccess}
-          onCancel={this.handlePinCancel}
-        />
+        <PinVerification visible={visible} title={title} onSuccess={this.handlePinSuccess} onCancel={this.handlePinCancel} />
       )
     }
 
     return (
       <LanguageContext.Consumer>
         {({ t }) => (
-          <Modal
-            animationType='fade'
-            transparent
-            visible={visible}
-            onRequestClose={onCancel}
-            statusBarTranslucent
-          >
+          <Modal animationType='fade' transparent visible={visible} onRequestClose={onCancel} statusBarTranslucent>
             <TouchableWithoutFeedback onPress={onCancel}>
               <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
                 <TouchableWithoutFeedback>
                   <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
                     <View style={styles.header}>
-                      <Text style={[styles.icon, { color: theme.colors.primary }]}>
-                        {this.getBiometricIcon()}
-                      </Text>
-                      <Text style={[styles.title, { color: theme.colors.text }]}>
-                        {title || t('settings.authenticateToAccess')}
-                      </Text>
-                      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                        {t('settings.tapToAuthenticate')}
-                      </Text>
+                      <Text style={[styles.icon, { color: theme.colors.primary }]}>{this.getBiometricIcon()}</Text>
+                      <Text style={[styles.title, { color: theme.colors.text }]}>{title || t('settings.authenticateToAccess')}</Text>
+                      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>{t('settings.tapToAuthenticate')}</Text>
                     </View>
 
                     <View style={styles.footer}>
-                      <Button
-                        title={t('settings.usePinInstead')}
-                        onPress={() => this.setState({ showPinFallback: true })}
-                        variant='outline'
-                        size='small'
-                        style={styles.pinButton}
-                      />
-                      <Button
-                        title={t('common.cancel')}
-                        onPress={onCancel}
-                        variant='secondary'
-                        size='small'
-                      />
+                      <Button title={t('settings.usePinInstead')} onPress={() => this.setState({ showPinFallback: true })} variant='outline' size='small' style={styles.pinButton} />
+                      <Button title={t('common.cancel')} onPress={onCancel} variant='secondary' size='small' />
                     </View>
                   </View>
                 </TouchableWithoutFeedback>

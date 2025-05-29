@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { ThemeContext } from '../../contexts/ThemeContext'
 
@@ -26,7 +26,7 @@ export default class PinInput extends Component {
     }
   }
 
-  removeDigit = () => {
+  handleRemoveDigit = () => {
     if (this.state.pin.length > 0) {
       this.setState({ pin: this.state.pin.slice(0, -1) })
     }
@@ -84,7 +84,7 @@ export default class PinInput extends Component {
 
           <TouchableOpacity
             style={[styles.key, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-            onPress={this.removeDigit}
+            onPress={this.handleRemoveDigit}
             activeOpacity={0.7}
           >
             <Text style={[styles.keyText, { color: theme.colors.textMuted }]}>⌫</Text>

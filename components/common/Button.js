@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { TouchableOpacity, Text, StyleSheet } from 'react-native'
 import { ThemeContext } from '../../contexts/ThemeContext'
 
