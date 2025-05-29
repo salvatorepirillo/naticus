@@ -53,7 +53,32 @@ export const en = {
     tapToAuthenticate: 'Tap to authenticate',
     usePinInstead: 'Use PIN instead',
     about: 'About',
-    version: 'Version {{version}}'
+    version: 'Version {{version}}',
+    
+    // Boat parameters
+    boatParameters: 'Boat Parameters',
+    boatParametersDescription: 'Configure your vessel data',
+    editBoatParameters: 'Edit Parameters',
+    boatName: 'Boat Name',
+    boatNamePlaceholder: 'Enter boat name',
+    loa: 'LOA (m)',
+    beam: 'BEAM (m)',
+    category: 'Category',
+    categoryA: 'Category A - Ocean',
+    categoryB: 'Category B - Offshore',
+    categoryC: 'Category C - Inshore',
+    selectCategory: 'Select Category',
+    weight: 'Weight (kg)',
+    height: 'Height (m)',
+    hullType: 'Hull Type',
+    hullTypeVshaped: 'V-Shaped',
+    hullTypeFlat: 'Flat',
+    hullTypeCatamaran: 'Catamaran',
+    selectHullType: 'Select Hull Type',
+    vShapeAngle: 'V-Shape Angle (°)',
+    boatPhoto: 'Boat Photo',
+    addPhoto: 'Add Photo',
+    changePhoto: 'Change Photo'
   },
 
   widgets: {

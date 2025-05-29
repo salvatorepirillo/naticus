@@ -9,6 +9,7 @@ import ThemeToggle from '../components/settings/ThemeToggle'
 import LanguageSelector from '../components/settings/LanguageSelector'
 import PinSetup from '../components/settings/PinSetup'
 import BiometricAuth from '../components/settings/BiometricAuth'
+import BoatParameters from '../components/settings/BoatParameters'
 
 export default class Settings extends Component {
   static contextType = ThemeContext
@@ -29,6 +30,10 @@ export default class Settings extends Component {
 
   handleBiometricDisabled = () => {
     console.log('Biometric authentication disabled')
+  }
+
+  handleParametersSaved = (parameters) => {
+    console.log('Boat parameters saved:', parameters)
   }
 
   render () {
@@ -52,6 +57,19 @@ export default class Settings extends Component {
                 <SettingsRow
                   title={t('settings.theme')}
                   component={<ThemeToggle />}
+                />
+              </View>
+
+              {/* Sezione Parametri Barca */}
+              <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+                <SettingsRow
+                  title={t('settings.boatParameters')}
+                  subtitle={t('settings.boatParametersDescription')}
+                  component={
+                    <BoatParameters
+                      onParametersSaved={this.handleParametersSaved}
+                    />
+                  }
                 />
               </View>
 

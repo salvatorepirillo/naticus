@@ -5,7 +5,8 @@ const STORAGE_KEYS = {
   LANGUAGE: 'language',
   USER_SETTINGS: 'userSettings',
   PIN: 'pin',
-  BIOMETRIC_ENABLED: 'biometric_enabled'
+  BIOMETRIC_ENABLED: 'biometric_enabled',
+  BOAT_PARAMETERS: 'boat_parameters'
 }
 
 export const storage = {
