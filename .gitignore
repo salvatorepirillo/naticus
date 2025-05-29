@@ -8,6 +8,7 @@ install-state.gz
 .pnp.cjs
 package-lock.json
 .env
+dist/
 
 # Expo
 .expo/
