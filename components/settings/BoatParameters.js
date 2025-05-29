@@ -54,7 +54,7 @@ export default class BoatParameters extends Component {
     }
   }
 
-  saveBoatParameters = async () => {
+  handleSaveBoatParameters = async () => {
     this.setState({ isLoading: true })
     try {
       const params = {
@@ -70,7 +70,7 @@ export default class BoatParameters extends Component {
       }
 
       await storage.set(STORAGE_KEYS.BOAT_PARAMETERS, params)
-      this.hideModal()
+      this.handleHideModal()
       this.props.onParametersSaved?.(params)
     } catch (error) {
       console.warn('Error saving boat parameters:', error)
@@ -80,11 +80,11 @@ export default class BoatParameters extends Component {
     }
   }
 
-  showModal = () => {
+  handleShowModal = () => {
     this.setState({ modalVisible: true })
   }
 
-  hideModal = () => {
+  handleHideModal = () => {
     this.setState({ modalVisible: false, showCategoryModal: false, showHullTypeModal: false })
   }
 
@@ -96,7 +96,7 @@ export default class BoatParameters extends Component {
     this.setState({ hullType, showHullTypeModal: false })
   }
 
-  pickImage = async () => {
+  handlePickImage = async () => {
     Alert.alert(
       'Seleziona Foto',
       'Scegli da dove vuoi prendere la foto',
@@ -146,7 +146,7 @@ export default class BoatParameters extends Component {
     }
   }
 
-  removeImage = () => {
+  handleRemoveImage = () => {
     this.setState({ boatImage: null })
   }
 
@@ -170,16 +170,10 @@ export default class BoatParameters extends Component {
                 {BOAT_CATEGORIES.map(category => (
                   <TouchableOpacity
                     key={category}
-                    style={[
-                      styles.selectorOption,
-                      category === this.state.category && { backgroundColor: theme.colors.primary + '20' }
-                    ]}
+                    style={[styles.selectorOption, category === this.state.category && { backgroundColor: theme.colors.primary + '20' }]}
                     onPress={() => this.selectCategory(category)}
                   >
-                    <Text style={[
-                      styles.selectorOptionText,
-                      { color: category === this.state.category ? theme.colors.primary : theme.colors.text }
-                    ]}>
+                    <Text style={[styles.selectorOptionText, { color: category === this.state.category ? theme.colors.primary : theme.colors.text }]}>
                       {t(`settings.category${category}`)}
                     </Text>
                   </TouchableOpacity>
@@ -221,7 +215,8 @@ export default class BoatParameters extends Component {
                     <Text style={[
                       styles.selectorOptionText,
                       { color: hullType === this.state.hullType ? theme.colors.primary : theme.colors.text }
-                    ]}>
+                    ]}
+                    >
                       {t(`settings.hullType${hullType.charAt(0).toUpperCase() + hullType.slice(1).replace('-', '')}`)}
                     </Text>
                   </TouchableOpacity>
@@ -243,7 +238,7 @@ export default class BoatParameters extends Component {
           <View>
             <Button
               title={t('settings.editBoatParameters')}
-              onPress={this.showModal}
+              onPress={this.handleShowModal}
               variant='outline'
               size='small'
             />
@@ -252,7 +247,7 @@ export default class BoatParameters extends Component {
               animationType='slide'
               transparent
               visible={this.state.modalVisible}
-              onRequestClose={this.hideModal}
+              onRequestClose={this.handleHideModal}
               statusBarTranslucent
             >
               <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
@@ -268,21 +263,23 @@ export default class BoatParameters extends Component {
                     <View style={styles.photoSection}>
                       <Text style={[styles.label, { color: theme.colors.text }]}>{t('settings.boatPhoto')}</Text>
                       <View style={styles.photoContainer}>
-                        {this.state.boatImage ? (
-                          <View style={styles.imageWrapper}>
-                            <Image source={{ uri: this.state.boatImage }} style={styles.boatImage} />
-                            <TouchableOpacity style={[styles.removeImageButton, { backgroundColor: theme.colors.danger }]} onPress={this.removeImage}>
-                              <Text style={styles.removeImageText}>✕</Text>
+                        {this.state.boatImage
+                          ? (
+                            <View style={styles.imageWrapper}>
+                              <Image source={{ uri: this.state.boatImage }} style={styles.boatImage} />
+                              <TouchableOpacity style={[styles.removeImageButton, { backgroundColor: theme.colors.danger }]} onPress={this.handleRemoveImage}>
+                                <Text style={styles.removeImageText}>✕</Text>
+                              </TouchableOpacity>
+                            </View>
+                            )
+                          : (
+                            <TouchableOpacity style={[styles.photoPlaceholder, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]} onPress={this.handlePickImage}>
+                              <Text style={[styles.photoPlaceholderIcon, { color: theme.colors.textMuted }]}>📷</Text>
+                              <Text style={[styles.photoPlaceholderText, { color: theme.colors.textMuted }]}>{t('settings.addPhoto')}</Text>
                             </TouchableOpacity>
-                          </View>
-                        ) : (
-                          <TouchableOpacity style={[styles.photoPlaceholder, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]} onPress={this.pickImage}>
-                            <Text style={[styles.photoPlaceholderIcon, { color: theme.colors.textMuted }]}>📷</Text>
-                            <Text style={[styles.photoPlaceholderText, { color: theme.colors.textMuted }]}>{t('settings.addPhoto')}</Text>
-                          </TouchableOpacity>
-                        )}
+                            )}
                         {this.state.boatImage && (
-                          <TouchableOpacity style={[styles.changePhotoButton, { backgroundColor: theme.colors.primary }]} onPress={this.pickImage}>
+                          <TouchableOpacity style={[styles.changePhotoButton, { backgroundColor: theme.colors.primary }]} onPress={this.handlePickImage}>
                             <Text style={styles.changePhotoText}>{t('settings.changePhoto')}</Text>
                           </TouchableOpacity>
                         )}
@@ -400,14 +397,14 @@ export default class BoatParameters extends Component {
                   <View style={styles.footer}>
                     <Button
                       title={t('common.cancel')}
-                      onPress={this.hideModal}
+                      onPress={this.handleHideModal}
                       variant='secondary'
                       size='medium'
                       style={styles.footerButton}
                     />
                     <Button
                       title={t('common.save')}
-                      onPress={this.saveBoatParameters}
+                      onPress={this.handleSaveBoatParameters}
                       variant='primary'
                       size='medium'
                       disabled={this.state.isLoading}

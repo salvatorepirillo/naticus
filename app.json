@@ -13,7 +13,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Questa app utilizza Face ID per l'autenticazione sicura e l'accesso alle funzioni protette della dashboard nautica."
+      }
     },
     "android": {
       "adaptiveIcon": {

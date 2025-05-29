@@ -22,16 +22,15 @@ export default class PinSetup extends Component {
 
   async componentDidMount () {
     const savedPin = await storage.get(STORAGE_KEYS.PIN)
-    console.log('Loaded PIN from storage:', savedPin)
     this.setState({ currentPin: savedPin })
   }
 
-  showModal = () => {
+  handleShowModal = () => {
     const step = this.state.currentPin ? 'verify' : 'new'
     this.setState({ modalVisible: true, step, error: '', tempPin: '' })
   }
 
-  hideModal = () => {
+  handleHideModal = () => {
     this.setState({ modalVisible: false, step: 'verify', error: '', tempPin: '' })
   }
 
@@ -40,7 +39,6 @@ export default class PinSetup extends Component {
 
     switch (step) {
       case 'verify':
-        console.log('Verifying PIN:', pin, 'vs', currentPin)
         if (String(pin) === String(currentPin)) {
           this.setState({ step: 'action', error: '' })
         } else {
@@ -56,7 +54,7 @@ export default class PinSetup extends Component {
         if (pin === tempPin) {
           await storage.set(STORAGE_KEYS.PIN, pin)
           this.setState({ currentPin: pin })
-          this.hideModal()
+          this.handleHideModal()
           this.props.onPinSet?.(pin)
         } else {
           this.setState({ error: 'I PIN non corrispondono', step: 'new', tempPin: '' })
@@ -65,14 +63,14 @@ export default class PinSetup extends Component {
     }
   }
 
-  changePin = () => {
+  handleChangePin = () => {
     this.setState({ step: 'new', error: '', tempPin: '' })
   }
 
-  removePin = async () => {
+  handleRemovePin = async () => {
     await storage.remove(STORAGE_KEYS.PIN)
     this.setState({ currentPin: null })
-    this.hideModal()
+    this.handleHideModal()
     this.props.onPinRemoved?.()
   }
 
@@ -96,7 +94,7 @@ export default class PinSetup extends Component {
           <View>
             <Button
               title={currentPin ? t('settings.changePin') : t('settings.setPin')}
-              onPress={this.showModal}
+              onPress={this.handleShowModal}
               variant='outline'
               size='small'
             />
@@ -105,10 +103,10 @@ export default class PinSetup extends Component {
               animationType='fade'
               transparent
               visible={modalVisible}
-              onRequestClose={this.hideModal}
+              onRequestClose={this.handleHideModal}
               statusBarTranslucent
             >
-              <TouchableWithoutFeedback onPress={this.hideModal}>
+              <TouchableWithoutFeedback onPress={this.handleHideModal}>
                 <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
                   <TouchableWithoutFeedback>
                     <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
@@ -123,14 +121,14 @@ export default class PinSetup extends Component {
                           <View style={styles.actionButtons}>
                             <Button
                               title={t('settings.changePin')}
-                              onPress={this.changePin}
+                              onPress={this.handleChangePin}
                               variant='primary'
                               size='medium'
                               style={styles.actionButton}
                             />
                             <Button
                               title={t('settings.removePin')}
-                              onPress={this.removePin}
+                              onPress={this.handleRemovePin}
                               variant='danger'
                               size='medium'
                               style={styles.actionButton}
@@ -147,7 +145,7 @@ export default class PinSetup extends Component {
                       <View style={styles.footer}>
                         <Button
                           title={t('common.cancel')}
-                          onPress={this.hideModal}
+                          onPress={this.handleHideModal}
                           variant='secondary'
                           size='small'
                         />

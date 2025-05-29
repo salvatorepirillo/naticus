@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { View, Text, StyleSheet, Alert } from 'react-native'
 import * as LocalAuthentication from 'expo-local-authentication'
 import { ThemeContext } from '../../contexts/ThemeContext'
@@ -30,7 +30,6 @@ export default class BiometricAuth extends Component {
       const isSupported = await LocalAuthentication.hasHardwareAsync()
       const isEnrolled = await LocalAuthentication.isEnrolledAsync()
       const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync()
-
       let biometricType = 'biometric'
       if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
         biometricType = 'faceId'
@@ -40,43 +39,43 @@ export default class BiometricAuth extends Component {
 
       this.setState({ isSupported, isEnrolled, biometricType })
     } catch (error) {
-      console.warn('Error checking biometric support:', error)
+      console.warn('❌ Error checking biometric support:', error)
     }
   }
 
   authenticateWithBiometrics = async () => {
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Autentica per continuare',
+        promptMessage: 'Autentica con Face ID per continuare',
         cancelLabel: 'Annulla',
-        fallbackLabel: 'Usa PIN'
+        fallbackLabel: 'Usa PIN',
+        disableDeviceFallback: false
       })
-
       if (result.success) {
         return true
       } else {
-        console.log('Biometric authentication failed:', result.error)
+        console.log('❌ Biometric authentication failed:', result.error)
         return false
       }
     } catch (error) {
-      console.warn('Biometric authentication error:', error)
+      console.warn('❌ Biometric authentication error:', error)
       return false
     }
   }
 
-  toggleBiometric = async () => {
+  handleToggleBiometric = async () => {
     const { isEnabled } = this.state
 
     if (!isEnabled) {
-      // Abilita biometrico
       const success = await this.authenticateWithBiometrics()
       if (success) {
         await storage.set(STORAGE_KEYS.BIOMETRIC_ENABLED, true)
         this.setState({ isEnabled: true })
         this.props.onBiometricEnabled?.()
+      } else {
+        console.log('❌ Failed to enable biometric')
       }
     } else {
-      // Disabilita biometrico
       Alert.alert(
         'Disabilita autenticazione biometrica',
         'Vuoi disabilitare l\'autenticazione biometrica?',
@@ -117,6 +116,7 @@ export default class BiometricAuth extends Component {
     const { isSupported, isEnrolled, isEnabled } = this.state
 
     if (!isSupported || !isEnrolled) {
+      console.log('⚠️ Biometric not available - hiding component')
       return null
     }
 
@@ -139,7 +139,7 @@ export default class BiometricAuth extends Component {
             </View>
             <Button
               title={isEnabled ? t('common.disable') : t('common.enable')}
-              onPress={this.toggleBiometric}
+              onPress={this.handleToggleBiometric}
               variant={isEnabled ? 'secondary' : 'primary'}
               size='small'
             />

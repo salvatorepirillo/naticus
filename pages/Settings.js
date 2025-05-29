@@ -14,26 +14,13 @@ import BoatParameters from '../components/settings/BoatParameters'
 export default class Settings extends Component {
   static contextType = ThemeContext
 
-  handlePinSet = (pin) => {
-    // Callback per quando il PIN viene impostato
-    console.log('PIN impostato')
-  }
-
-  handlePinRemoved = () => {
-    // Callback per quando il PIN viene rimosso
-    console.log('PIN rimosso')
-  }
-
   handleBiometricEnabled = () => {
-    console.log('Biometric authentication enabled')
   }
 
   handleBiometricDisabled = () => {
-    console.log('Biometric authentication disabled')
   }
 
   handleParametersSaved = (parameters) => {
-    console.log('Boat parameters saved:', parameters)
   }
 
   render () {
@@ -87,8 +74,8 @@ export default class Settings extends Component {
                   subtitle={t('settings.pinDescription')}
                   component={
                     <PinSetup
-                      onPinSet={this.handlePinSet}
-                      onPinRemoved={this.handlePinRemoved}
+                      onPinSet={() => {}}
+                      onPinRemoved={() => {}}
                     />
                   }
                 />

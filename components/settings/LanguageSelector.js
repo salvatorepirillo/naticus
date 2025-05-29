@@ -10,17 +10,10 @@ export default class LanguageSelector extends Component {
   constructor (props) {
     super(props)
     this.state = { modalVisible: false }
-    console.log('LanguageSelector: Constructor called')
   }
 
-  componentDidCatch (error, errorInfo) {
-    console.error('LanguageSelector crashed:', error, errorInfo)
-    Alert.alert('Errore', `LanguageSelector crash: ${error.message}`)
-  }
-
-  showModal = () => {
+  handleShowModal = () => {
     try {
-      console.log('LanguageSelector: Opening modal')
       this.setState({ modalVisible: true })
     } catch (error) {
       console.error('LanguageSelector: Error opening modal:', error)
@@ -28,9 +21,8 @@ export default class LanguageSelector extends Component {
     }
   }
 
-  hideModal = () => {
+  handleHideModal = () => {
     try {
-      console.log('LanguageSelector: Closing modal')
       this.setState({ modalVisible: false })
     } catch (error) {
       console.error('LanguageSelector: Error closing modal:', error)
@@ -39,9 +31,8 @@ export default class LanguageSelector extends Component {
 
   selectLanguage = (langCode, changeLanguage) => {
     try {
-      console.log('LanguageSelector: Selecting language:', langCode)
       changeLanguage(langCode)
-      this.hideModal()
+      this.handleHideModal()
     } catch (error) {
       console.error('LanguageSelector: Error selecting language:', error)
       Alert.alert('Errore', `Errore selezione lingua: ${error.message}`)
@@ -50,7 +41,6 @@ export default class LanguageSelector extends Component {
 
   render () {
     try {
-      console.log('LanguageSelector: Rendering')
       const { theme } = this.context
 
       if (!theme) {
@@ -62,8 +52,6 @@ export default class LanguageSelector extends Component {
         <LanguageContext.Consumer>
           {(languageContext) => {
             try {
-              console.log('LanguageSelector: Language context:', languageContext)
-
               if (!languageContext) {
                 console.error('LanguageSelector: No language context')
                 return <Text>Errore: Contesto lingua non disponibile</Text>
@@ -80,7 +68,7 @@ export default class LanguageSelector extends Component {
                 <View>
                   <TouchableOpacity
                     style={[styles.selector, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-                    onPress={this.showModal}
+                    onPress={this.handleShowModal}
                   >
                     <Text style={[styles.selectedText, { color: theme.colors.text }]}>
                       {languageNames[currentLanguage] || currentLanguage}
@@ -91,9 +79,9 @@ export default class LanguageSelector extends Component {
                     animationType='fade'
                     transparent
                     visible={this.state.modalVisible}
-                    onRequestClose={this.hideModal}
+                    onRequestClose={this.handleHideModal}
                   >
-                    <TouchableWithoutFeedback onPress={this.hideModal}>
+                    <TouchableWithoutFeedback onPress={this.handleHideModal}>
                       <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
                         <TouchableWithoutFeedback>
                           <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
