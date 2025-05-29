@@ -15,14 +15,64 @@ export const en = {
 
   navigation: {
     dashboard: 'Dashboard',
+    maps: 'Nautical charts',
     settings: 'Settings'
+  },
+
+  weather: {
+    title: 'Marine Weather',
+    loading: 'Loading weather...',
+    current: 'Current Conditions',
+    feelsLike: 'Feels like',
+    humidity: 'Humidity',
+    pressure: 'Pressure',
+    cloudCover: 'Cloud Cover',
+    precipitation: 'Precipitation',
+    wind: 'Wind',
+    gusts: 'Gusts',
+    windSpeedMs: 'Speed m/s',
+    marine: 'Marine Conditions',
+    waveHeight: 'Wave Height',
+    waveDirection: 'Wave Direction',
+    wavePeriod: 'Wave Period',
+    windWaveHeight: 'Wind Waves',
+    windWavePeriod: 'Wind Wave Period',
+    swellHeight: 'Swell Height',
+    swellPeriod: 'Swell Period',
+    swellDirection: 'Swell Direction',
+    noMarineData: 'Marine data not available for this location',
+    lastUpdate: 'Last update'
+  },
+
+  safety: {
+    title: 'Navigation Safety',
+    ideal: 'Ideal Conditions',
+    good: 'Good Conditions',
+    caution: 'Navigation Possible - Use Caution',
+    challenging: 'Challenging Conditions',
+    notRecommended: 'Not Recommended',
+    description: 'Score based on weather, boat parameters and marine conditions',
+    noData: 'Configure boat parameters to calculate safety',
+    loading: 'Calculating safety score...',
+    detailsTitle: 'Detailed Analysis',
+    params: {
+      waveHeight: 'Wave Height',
+      wavePeriod: 'Wave Period',
+      windWaveHeight: 'Wind Waves',
+      windWavePeriod: 'Wind Wave Period',
+      windSpeed: 'Wind Speed',
+      windGusts: 'Gust Difference',
+      visibility: 'Visibility',
+      boatStability: 'Boat Stability',
+      boatCategory: 'CE Cat. Boat'
+    }
   },
 
   dashboard: {
     title: 'Boat Dashboard',
     welcome: 'Welcome aboard',
-    noData: 'No data available',
-    lastUpdate: 'Last update: {{time}}'
+    loadingLocation: 'Getting GPS location...',
+    loadingWeather: 'Loading weather data...'
   },
 
   settings: {

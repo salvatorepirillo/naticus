@@ -15,14 +15,15 @@ export const it = {
 
   navigation: {
     dashboard: 'Dashboard',
+    maps: 'Carte nautiche',
     settings: 'Impostazioni'
   },
 
   dashboard: {
     title: 'Dashboard Barca',
     welcome: 'Benvenuto a bordo',
-    noData: 'Nessun dato disponibile',
-    lastUpdate: 'Ultimo aggiornamento: {{time}}'
+    loadingLocation: 'Rilevamento posizione GPS...',
+    loadingWeather: 'Caricamento dati meteo...'
   },
 
   maps: {
@@ -40,6 +41,55 @@ export const it = {
     storage: 'Spazio utilizzato: {{size}}',
     clearCache: 'Pulisci Cache',
     manageMaps: 'Gestisci Mappe'
+  },
+
+  weather: {
+    title: 'Meteo Marino',
+    loading: 'Caricamento meteo...',
+    current: 'Condizioni Attuali',
+    feelsLike: 'Percepita',
+    humidity: 'Umidità',
+    pressure: 'Pressione',
+    cloudCover: 'Nuvolosità',
+    precipitation: 'Precipitazioni',
+    wind: 'Vento',
+    gusts: 'Raffiche',
+    windSpeedMs: 'Velocità m/s',
+    marine: 'Condizioni Marine',
+    waveHeight: 'Altezza Onde',
+    waveDirection: 'Direzione Onde',
+    wavePeriod: 'Periodo Onde',
+    windWaveHeight: 'Onde da Vento',
+    windWavePeriod: 'Periodo Onde Vento',
+    swellHeight: 'Altezza Frangenti',
+    swellPeriod: 'Periodo Frangenti',
+    swellDirection: 'Direzione Frangenti',
+    noMarineData: 'Dati marini non disponibili per questa posizione',
+    lastUpdate: 'Ultimo aggiornamento'
+  },
+
+  safety: {
+    title: 'Sicurezza Navigazione',
+    ideal: 'Condizioni Ideali',
+    good: 'Condizioni Buone',
+    caution: 'Navigazione Possibile - Attenzione',
+    challenging: 'Condizioni Impegnative',
+    notRecommended: 'Sconsigliato Uscire',
+    description: 'Punteggio basato su meteo, parametri barca e condizioni marine',
+    noData: 'Configura parametri barca per calcolare la sicurezza',
+    loading: 'Calcolo punteggio sicurezza...',
+    detailsTitle: 'Analisi Dettagliata',
+    params: {
+      waveHeight: 'Altezza Onde',
+      wavePeriod: 'Periodo Onde',
+      windWaveHeight: 'Onde da Vento',
+      windWavePeriod: 'Periodo Onde Vento',
+      windSpeed: 'Velocità Vento',
+      windGusts: 'Differenza Raffiche',
+      visibility: 'Visibilità',
+      boatStability: 'Stabilità Barca',
+      boatCategory: 'Cat. CE Barca'
+    }
   },
 
   settings: {

@@ -1,564 +1,135 @@
-import { Component } from 'react'
-import { View, StyleSheet, Alert, Text, TouchableOpacity, Image, Dimensions, PanResponder, TextInput, ActivityIndicator, Animated } from 'react-native'
-import * as FileSystem from 'expo-file-system'
+import React, { Component } from 'react'
+import { View, StyleSheet, ActivityIndicator } from 'react-native'
+import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
-import { ThemeContext } from '../../contexts/ThemeContext'
-import { storage, STORAGE_KEYS } from '../../utils/storage'
-
-const { width, height } = Dimensions.get('window')
-const TILE_SIZE = 256
-const MAX_CACHE_SIZE = 100 * 1024 * 1024 // 100MB max cache
-const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000 // 7 giorni
 
 export default class MaritimeMap extends Component {
-  static contextType = ThemeContext
-
   constructor (props) {
     super(props)
     this.state = {
-      center: { lat: 41.9028, lng: 12.4964 },
-      zoom: 10,
-      userLocation: null,
-      mapTiles: [],
-      isPanning: false,
-      isZooming: false,
-      showSearch: false,
-      searchQuery: '',
-      isLoading: false,
-      tileCache: {},
-      downloadQueue: new Set(),
-      isOnline: true,
-      fadeAnim: new Animated.Value(1)
+      location: null,
+      loading: true
     }
-
-    this.lastPan = { x: 0, y: 0 }
-    this.initialDistance = null
-    this.initialZoom = null
-    this.throttleTimer = null
-    this.downloadTimer = null
-    this.createPanResponder()
   }
 
   async componentDidMount () {
-    await this.initializeMap()
-    this.startAutoDownload()
-    this.checkConnectivity()
-  }
-
-  componentWillUnmount () {
-    if (this.throttleTimer) clearTimeout(this.throttleTimer)
-    if (this.downloadTimer) clearInterval(this.downloadTimer)
-  }
-
-  initializeMap = async () => {
-    await this.requestLocationPermission()
-    await this.loadCacheInfo()
-    this.loadMapTiles()
-  }
-
-  checkConnectivity = () => {
-    // TODO:
-    // Simula check connettività - in produzione usare NetInfo
-    this.setState({ isOnline: true })
-  }
-
-  loadCacheInfo = async () => {
-    try {
-      if (storage && storage.get) {
-        const cacheInfo = await storage.get(STORAGE_KEYS.TILE_CACHE_INFO) || {}
-        this.setState({ tileCache: cacheInfo })
-      }
-    } catch (error) {
-      console.warn('Error loading cache info:', error)
-      this.setState({ tileCache: {} })
-    }
-  }
-
-  startAutoDownload = () => {
-    // Download automatico delle tiles visitate ogni 5 secondi
-    this.downloadTimer = setInterval(() => {
-      this.processDownloadQueue()
-    }, 5000)
-  }
-
-  createPanResponder = () => {
-    this.panResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const touches = evt.nativeEvent.touches
-        if (touches.length === 2) {
-          this.handlePinchStart(evt)
-        } else if (touches.length === 1) {
-          this.lastPan = { x: 0, y: 0 }
-          this.setState({ isPanning: true })
-        }
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        const touches = evt.nativeEvent.touches
-        if (touches.length === 2) {
-          this.handlePinchMove(evt)
-        } else if (touches.length === 1 && !this.state.isZooming) {
-          this.handlePan(gestureState)
-        }
-      },
-      onPanResponderRelease: () => {
-        this.lastPan = { x: 0, y: 0 }
-        this.initialDistance = null
-        this.initialZoom = null
-        this.setState({ isPanning: false, isZooming: false })
-      }
-    })
-  }
-
-  handlePan = (gestureState) => {
-    const deltaX = gestureState.dx - this.lastPan.x
-    const deltaY = gestureState.dy - this.lastPan.y
-
-    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-      this.panMap(deltaX, deltaY)
-      this.lastPan = { x: gestureState.dx, y: gestureState.dy }
-    }
-  }
-
-  handlePinchStart = (evt) => {
-    const touches = evt.nativeEvent.touches
-    if (touches.length === 2) {
-      const dx = touches[0].pageX - touches[1].pageX
-      const dy = touches[0].pageY - touches[1].pageY
-      this.initialDistance = Math.sqrt(dx * dx + dy * dy)
-      this.initialZoom = this.state.zoom
-      this.setState({ isZooming: true, isPanning: false })
-    }
-  }
-
-  handlePinchMove = (evt) => {
-    const touches = evt.nativeEvent.touches
-    if (touches.length === 2 && this.initialDistance && this.initialZoom !== null) {
-      const dx = touches[0].pageX - touches[1].pageX
-      const dy = touches[0].pageY - touches[1].pageY
-      const distance = Math.sqrt(dx * dx + dy * dy)
-
-      const scale = distance / this.initialDistance
-      let newZoom = this.initialZoom * scale
-
-      // Limita lo zoom tra 3 e 18
-      newZoom = Math.max(3, Math.min(18, newZoom))
-
-      // Arrotonda a interi per maggiore stabilità
-      const roundedZoom = Math.round(newZoom)
-
-      if (roundedZoom !== this.state.zoom) {
-        this.setState({ zoom: roundedZoom }, this.loadMapTiles)
-      }
-    }
-  }
-
-  requestLocationPermission = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status === 'granted') {
-        const location = await Location.getCurrentPositionAsync({})
-        this.setState({ userLocation: { lat: location.coords.latitude, lng: location.coords.longitude }, center: { lat: location.coords.latitude, lng: location.coords.longitude } }, this.loadMapTiles)
-      } else {
-        this.loadMapTiles()
-      }
-    } catch (error) {
-      console.warn('Error getting location:', error)
-      this.loadMapTiles()
-    }
-  }
-
-  loadMapTilesThrottled = () => {
-    if (this.throttleTimer) clearTimeout(this.throttleTimer)
-    this.throttleTimer = setTimeout(() => {
-      this.loadMapTiles()
-    }, 100)
-  }
-
-  loadMapTiles = () => {
-    const { center, zoom } = this.state
-    const tiles = this.calculateVisibleTiles(center, zoom)
-
-    // Aggiungi tiles alla coda di download
-    tiles.forEach(tile => {
-      const key = `${tile.z}_${tile.x}_${tile.y}`
-      if (!this.isTileCached(key)) {
-        this.state.downloadQueue.add(key)
-      }
-    })
-
-    this.setState({ mapTiles: tiles })
-  }
-
-  isTileCached = (key) => {
-    const cacheEntry = this.state.tileCache[key]
-    if (!cacheEntry) return false
-
-    const now = Date.now()
-    return (now - cacheEntry.timestamp) < CACHE_DURATION
-  }
-
-  processDownloadQueue = async () => {
-    if (this.state.downloadQueue.size === 0 || !this.state.isOnline) return
-
-    const queue = Array.from(this.state.downloadQueue).slice(0, 5) // Download max 5 tiles alla volta
-
-    for (const key of queue) {
-      this.state.downloadQueue.delete(key)
-      await this.downloadTile(key)
-    }
-  }
-
-  downloadTile = async (key) => {
-    const [z, x, y] = key.split('_').map(Number)
-    const tileUrl = `https://tiles.openseamap.org/seamark/${z}/${x}/${y}.png`
-    const tilePath = `${FileSystem.documentDirectory}maps/tiles/${key}.png`
-
-    try {
-      await FileSystem.makeDirectoryAsync(`${FileSystem.documentDirectory}maps/tiles/`, { intermediates: true })
-      await FileSystem.downloadAsync(tileUrl, tilePath)
-
-      // Aggiorna cache info
-      const newCache = { ...this.state.tileCache }
-      newCache[key] = { timestamp: Date.now(), size: 256 * 256 * 4 } // Stima dimensione
-
-      this.setState({ tileCache: newCache })
-      if (storage && storage.set) {
-        await storage.set(STORAGE_KEYS.TILE_CACHE_INFO, newCache)
-      }
-
-      // Gestisci dimensione cache
-      await this.manageCacheSize()
-    } catch (error) {
-      console.warn(`Failed to download tile ${key}:`, error.message)
-    }
-  }
-
-  manageCacheSize = async () => {
-    const cacheEntries = Object.entries(this.state.tileCache)
-    let totalSize = cacheEntries.reduce((sum, [_, info]) => sum + info.size, 0)
-
-    if (totalSize > MAX_CACHE_SIZE) {
-      // Rimuovi tiles più vecchie
-      cacheEntries.sort((a, b) => a[1].timestamp - b[1].timestamp)
-
-      while (totalSize > MAX_CACHE_SIZE * 0.8 && cacheEntries.length > 0) {
-        const [key, info] = cacheEntries.shift()
-        totalSize -= info.size
-
-        // Rimuovi file
-        try {
-          await FileSystem.deleteAsync(`${FileSystem.documentDirectory}maps/tiles/${key}.png`)
-        } catch (error) {
-          console.warn('Error deleting tile:', error)
-        }
-
-        delete this.state.tileCache[key]
-      }
-
-      if (storage && storage.set) {
-        await storage.set(STORAGE_KEYS.TILE_CACHE_INFO, this.state.tileCache)
-      }
-    }
-  }
-
-  calculateVisibleTiles = (center, zoom) => {
-    const buffer = 1 // tiles extra per lato
-    const tilesToLoadH = Math.ceil(width / TILE_SIZE) + buffer * 2
-    const tilesToLoadV = Math.ceil(height / TILE_SIZE) + buffer * 2
-
-    const centerPixelX = this.long2pixel(center.lng, zoom)
-    const centerPixelY = this.lat2pixel(center.lat, zoom)
-
-    const viewTopLeftPixelX = centerPixelX - width / 2
-    const viewTopLeftPixelY = centerPixelY - height / 2
-
-    const startTileX = Math.floor(viewTopLeftPixelX / TILE_SIZE)
-    const startTileY = Math.floor(viewTopLeftPixelY / TILE_SIZE)
-
-    const tiles = []
-    const maxTiles = Math.pow(2, zoom)
-
-    for (let x = 0; x < tilesToLoadH; x++) {
-      for (let y = 0; y < tilesToLoadV; y++) {
-        const tileX = startTileX + x
-        const tileY = startTileY + y
-
-        if (tileX >= 0 && tileY >= 0 && tileX < maxTiles && tileY < maxTiles) {
-          const key = `${zoom}_${tileX}_${tileY}`
-          tiles.push({
-            x: tileX,
-            y: tileY,
-            z: zoom,
-            left: tileX * TILE_SIZE - viewTopLeftPixelX,
-            top: tileY * TILE_SIZE - viewTopLeftPixelY,
-            url: this.getTileUrl(tileX, tileY, zoom, key),
-            key
-          })
-        }
-      }
-    }
-    return tiles
-  }
-
-  getTileUrl = (x, y, z, key) => {
-    if (this.isTileCached(key)) {
-      return `${FileSystem.documentDirectory}maps/tiles/${key}.png`
-    }
-    return this.state.isOnline
-      ? `https://tiles.openseamap.org/seamark/${z}/${x}/${y}.png`
-      : null // Ritorna null se offline e non in cache
-  }
-
-  // Funzioni di conversione coordinate
-  long2pixel = (lng, zoom) => ((lng + 180) / 360) * Math.pow(2, zoom) * 256
-  lat2pixel = (lat, zoom) => {
-    const latRad = lat * Math.PI / 180
-    return (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * Math.pow(2, zoom) * 256
-  }
-
-  pixel2long = (pixelX, zoom) => (pixelX / (Math.pow(2, zoom) * 256)) * 360 - 180
-  pixel2lat = (pixelY, zoom) => {
-    const n = Math.PI - (2 * Math.PI * pixelY) / (Math.pow(2, zoom) * 256)
-    return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))
-  }
-
-  zoomIn = () => {
-    if (this.state.zoom < 18) {
-      this.setState(prevState => ({ zoom: Math.min(18, prevState.zoom + 1) }), this.loadMapTilesThrottled)
-    }
-  }
-
-  zoomOut = () => {
-    if (this.state.zoom > 3) {
-      this.setState(prevState => ({ zoom: Math.max(3, prevState.zoom - 1) }), this.loadMapTilesThrottled)
-    }
-  }
-
-  panMap = (deltaX, deltaY) => {
-    const { center, zoom } = this.state
-
-    const currentCenterPixelX = this.long2pixel(center.lng, zoom)
-    const currentCenterPixelY = this.lat2pixel(center.lat, zoom)
-
-    // Inverti delta per il movimento della mappa
-    const newCenterPixelX = currentCenterPixelX - deltaX
-    const newCenterPixelY = currentCenterPixelY - deltaY
-
-    const newLng = this.pixel2long(newCenterPixelX, zoom)
-    const newLat = this.pixel2lat(newCenterPixelY, zoom)
-
-    this.setState({ center: { lat: newLat, lng: newLng } }, () => {
-      this.loadMapTiles()
-    })
-  }
-
-  handleCenterOnUserLocation = () => {
-    const { userLocation } = this.state
-    if (userLocation) {
-      Animated.timing(this.state.fadeAnim, {
-        toValue: 0.5,
-        duration: 150,
-        useNativeDriver: true
-      }).start(() => {
-        this.setState({ center: userLocation }, () => {
-          this.loadMapTiles()
-          Animated.timing(this.state.fadeAnim, {
-            toValue: 1,
-            duration: 150,
-            useNativeDriver: true
-          }).start()
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High
         })
-      })
-    } else {
-      Alert.alert('Posizione', 'Posizione utente non disponibile')
+        this.setState({ location, loading: false })
+      } else {
+        this.setState({ loading: false })
+      }
+    } catch (error) {
+      console.error('Location error:', error)
+      this.setState({ loading: false })
     }
   }
 
-  handleSearchLocation = async () => {
-    const { searchQuery } = this.state
-    if (!searchQuery.trim()) return
+  generateHTML () {
+    const { location } = this.state
+    const lat = location?.coords.latitude || 43.7696
+    const lng = location?.coords.longitude || 11.2558
 
-    this.setState({ isLoading: true })
-
-    // Implementazione semplificata - in produzione usare geocoding API
-    // Per ora cerca solo alcune località predefinite
-    const locations = {
-      roma: { lat: 41.9028, lng: 12.4964 },
-      napoli: { lat: 40.8518, lng: 14.2681 },
-      genova: { lat: 44.4056, lng: 8.9463 },
-      venezia: { lat: 45.4408, lng: 12.3155 },
-      palermo: { lat: 38.1157, lng: 13.3615 },
-      cagliari: { lat: 39.2238, lng: 9.1217 }
-    }
-
-    const searchLower = searchQuery.toLowerCase()
-    const location = locations[searchLower]
-
-    if (location) {
-      this.setState({
-        center: location,
-        showSearch: false,
-        searchQuery: '',
-        isLoading: false
-      }, this.loadMapTiles)
-    } else {
-      Alert.alert('Ricerca', 'Località non trovata')
-      this.setState({ isLoading: false })
-    }
-  }
-
-  renderMapTiles = () => {
-    return this.state.mapTiles.map(tile => {
-      if (!tile.url) return null // Skip se offline e non in cache
-
-      return (
-        <Image
-          key={tile.key}
-          source={{ uri: tile.url }}
-          style={[
-            styles.tile,
-            {
-              left: tile.left,
-              top: tile.top
-            }
-          ]}
-          fadeDuration={0}
-        />
-      )
-    })
-  }
-
-  renderUserLocation = () => {
-    const { userLocation, center, zoom } = this.state
-    const { theme } = this.context
-
-    if (!userLocation) return null
-
-    const userWorldPixelX = this.long2pixel(userLocation.lng, zoom)
-    const userWorldPixelY = this.lat2pixel(userLocation.lat, zoom)
-
-    const centerWorldPixelX = this.long2pixel(center.lng, zoom)
-    const centerWorldPixelY = this.lat2pixel(center.lat, zoom)
-
-    const screenTopLeftWorldPixelX = centerWorldPixelX - width / 2
-    const screenTopLeftWorldPixelY = centerWorldPixelY - height / 2
-
-    const markerScreenX = userWorldPixelX - screenTopLeftWorldPixelX
-    const markerScreenY = userWorldPixelY - screenTopLeftWorldPixelY
-
-    const markerSize = 24
-
-    if (markerScreenX < -markerSize || markerScreenX > width + markerSize ||
-        markerScreenY < -markerSize || markerScreenY > height + markerSize) {
-      return null
-    }
-
-    return (
-      <View
-        style={[
-          styles.userMarker,
-          {
-            left: markerScreenX - markerSize / 2,
-            top: markerScreenY - markerSize / 2,
-            backgroundColor: theme.colors.primary,
-            width: markerSize,
-            height: markerSize,
-            borderRadius: markerSize / 2
-          }
-        ]}
-      >
-        <View style={styles.userMarkerInner} />
-      </View>
-    )
-  }
-
-  renderControls = () => {
-    const { theme } = this.context
-    const { showSearch, searchQuery, isLoading, isOnline, userLocation } = this.state
-
-    return (
-      <>
-        {/* Barra di ricerca */}
-        {showSearch && (
-          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-            <TextInput
-              style={[styles.searchInput, { color: theme.colors.text }]}
-              placeholder='Cerca località...'
-              placeholderTextColor={theme.colors.placeholder}
-              value={searchQuery}
-              onChangeText={(text) => this.setState({ searchQuery: text })}
-              onSubmitEditing={this.handleSearchLocation}
-              autoFocus
-            />
-            {isLoading
-              ? (
-                <ActivityIndicator size='small' color={theme.colors.primary} />
-                )
-              : (
-                <TouchableOpacity onPress={this.handleSearchLocation}>
-                  <Text style={[styles.searchButton, { color: theme.colors.primary }]}>🔍</Text>
-                </TouchableOpacity>
-                )}
-            <TouchableOpacity onPress={() => this.setState({ showSearch: false, searchQuery: '' })}>
-              <Text style={[styles.searchButton, { color: theme.colors.error }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Controlli principali */}
-        <View style={styles.mainControls}>
-          {/* Tasto ricerca */}
-          <TouchableOpacity
-            style={[styles.controlButton, { backgroundColor: theme.colors.surface }]}
-            onPress={() => this.setState({ showSearch: !showSearch })}
-          >
-            <Text style={styles.controlIcon}>🔍</Text>
-          </TouchableOpacity>
-
-          {/* Tasto posizione */}
-          {userLocation && (
-            <TouchableOpacity
-              style={[styles.controlButton, { backgroundColor: theme.colors.surface }]}
-              onPress={this.handleCenterOnUserLocation}
-            >
-              <Text style={styles.controlIcon}>📍</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Indicatore stato */}
-          <View style={[styles.statusIndicator, { backgroundColor: theme.colors.surface }]}>
-            <View style={[styles.statusDot, { backgroundColor: isOnline ? theme.colors.success : theme.colors.warning }]} />
-            <Text style={[styles.statusText, { color: theme.colors.text }]}>
-              {isOnline ? 'Online' : 'Offline'}
-            </Text>
-          </View>
-        </View>
-      </>
-    )
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          body { margin: 0; padding: 0; overflow: hidden; }
+          #map { height: 100vh; width: 100vw; }
+          .leaflet-control-attribution { font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          const map = L.map('map', {
+            center: [${lat}, ${lng}],
+            zoom: 12,
+            zoomControl: true,
+            attributionControl: false
+          });
+          
+          // Base map
+          const baseMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18
+          }).addTo(map);
+          
+          // Marine overlay
+          const seaMarks = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+            opacity: 0.8,
+            maxZoom: 18
+          }).addTo(map);
+          
+          // Depth contours
+          const depths = L.tileLayer('https://tiles.openseamap.org/depth/{z}/{x}/{y}.png', {
+            opacity: 0.6,
+            maxZoom: 16
+          }).addTo(map);
+          
+          // Current position marker
+          const marker = L.marker([${lat}, ${lng}], {
+            title: 'Posizione attuale'
+          }).addTo(map);
+          
+          marker.bindPopup('<b>Posizione attuale</b><br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}');
+          
+          // Layer control
+          // const baseMaps = {
+          //   "Mappa base": baseMap
+          // };
+          
+          // const overlayMaps = {
+          //   "Segni marini": seaMarks,
+          //   "Profondità": depths
+          // };
+          
+          // L.control.layers(baseMaps, overlayMaps, {
+          //   position: 'topright',
+          //   collapsed: false
+          // }).addTo(map);
+          
+          // Scale control
+          L.control.scale({
+            position: 'bottomleft',
+            metric: true,
+            imperial: false
+          }).addTo(map);
+        </script>
+      </body>
+      </html>
+    `
   }
 
   render () {
-    const { theme } = this.context
+    const { loading } = this.state
+
+    if (loading) {
+      return (
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator size='large' color='#0066cc' />
+        </View>
+      )
+    }
 
     return (
       <View style={styles.container}>
-        <Animated.View
-          style={[styles.mapContainer, { opacity: this.state.fadeAnim }]}
-          {...this.panResponder.panHandlers}
-        >
-          {this.renderMapTiles()}
-          {this.renderUserLocation()}
-        </Animated.View>
-
-        {this.renderControls()}
-
-        <View style={[styles.disclaimer, { backgroundColor: theme.colors.overlay }]}>
-          <Text style={[styles.disclaimerText, { color: theme.colors.background }]}>
-            ⚠️ Le carte nautiche sono fornite da OpenSeaMap per uso indicativo
-          </Text>
-        </View>
+        <WebView
+          source={{ html: this.generateHTML() }}
+          style={styles.webview}
+          originWhitelist={['*']}
+          javaScriptEnabled
+          domStorageEnabled
+          startInLoadingState
+          scalesPageToFit
+        />
       </View>
     )
   }
@@ -567,109 +138,13 @@ export default class MaritimeMap extends Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    position: 'relative'
+    backgroundColor: '#f0f8ff'
   },
-  mapContainer: {
-    flex: 1,
-    overflow: 'hidden',
-    backgroundColor: '#A8C8EC'
+  webview: {
+    flex: 1
   },
-  tile: {
-    position: 'absolute',
-    width: TILE_SIZE,
-    height: TILE_SIZE
-  },
-  searchContainer: {
-    position: 'absolute',
-    top: 50,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    elevation: 5,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    height: 50
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    marginRight: 8
-  },
-  searchButton: {
-    fontSize: 20,
-    marginLeft: 8
-  },
-  mainControls: {
-    position: 'absolute',
-    top: 120,
-    right: 16,
-    gap: 12
-  },
-  controlButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  centered: {
     justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    marginBottom: 12
-  },
-  controlIcon: {
-    fontSize: 24
-  },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    elevation: 3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  userMarker: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    elevation: 5
-  },
-  userMarkerInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF'
-  },
-  disclaimer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 6,
-    paddingHorizontal: 12
-  },
-  disclaimerText: {
-    fontSize: 10,
-    textAlign: 'center',
-    fontWeight: '500'
+    alignItems: 'center'
   }
 })

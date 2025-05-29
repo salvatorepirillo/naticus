@@ -15,14 +15,64 @@ export const fr = {
 
   navigation: {
     dashboard: 'Tableau de Bord',
+    maps: 'Cartes marines',
     settings: 'Paramètres'
+  },
+
+  weather: {
+    title: 'Météo Marine',
+    loading: 'Chargement météo...',
+    current: 'Conditions Actuelles',
+    feelsLike: 'Ressenti',
+    humidity: 'Humidité',
+    pressure: 'Pression',
+    cloudCover: 'Couverture Nuageuse',
+    precipitation: 'Précipitations',
+    wind: 'Vent',
+    gusts: 'Rafales',
+    windSpeedMs: 'Vitesse m/s',
+    marine: 'Conditions Marines',
+    waveHeight: 'Hauteur des Vagues',
+    waveDirection: 'Direction des Vagues',
+    wavePeriod: 'Période des Vagues',
+    windWaveHeight: 'Vagues de Vent',
+    windWavePeriod: 'Période Vagues Vent',
+    swellHeight: 'Hauteur de Houle',
+    swellPeriod: 'Période de Houle',
+    swellDirection: 'Direction de Houle',
+    noMarineData: 'Données marines non disponibles pour cette position',
+    lastUpdate: 'Dernière mise à jour'
+  },
+
+  safety: {
+    title: 'Sécurité Navigation',
+    ideal: 'Conditions Idéales',
+    good: 'Bonnes Conditions',
+    caution: 'Navigation Possible - Attention',
+    challenging: 'Conditions Difficiles',
+    notRecommended: 'Non Recommandé',
+    description: 'Score basé sur météo, paramètres bateau et conditions marines',
+    noData: 'Configurez les paramètres du bateau pour calculer la sécurité',
+    loading: 'Calcul du score de sécurité...',
+    detailsTitle: 'Analyse Détaillée',
+    params: {
+      waveHeight: 'Hauteur des Vagues',
+      wavePeriod: 'Période des Vagues',
+      windWaveHeight: 'Vagues de Vent',
+      windWavePeriod: 'Période Vagues Vent',
+      windSpeed: 'Vitesse du Vent',
+      windGusts: 'Différence Rafales',
+      visibility: 'Visibilité',
+      boatStability: 'Stabilité Bateau',
+      boatCategory: 'Cat. CE Bateau'
+    }
   },
 
   dashboard: {
     title: 'Tableau de Bord Bateau',
     welcome: 'Bienvenue à bord',
-    noData: 'Aucune donnée disponible',
-    lastUpdate: 'Dernière mise à jour: {{time}}'
+    loadingLocation: 'Localisation GPS...',
+    loadingWeather: 'Chargement données météo...'
   },
 
   settings: {
