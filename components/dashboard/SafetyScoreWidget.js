@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
 import { ThemeContext } from '../../contexts/ThemeContext'

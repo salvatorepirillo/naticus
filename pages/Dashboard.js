@@ -1,12 +1,10 @@
-// === pages/Dashboard.js - Con LocationContext ===
-import React, { Component } from 'react'
+import { Component } from 'react'
 import { View, StyleSheet, ScrollView, ActivityIndicator, Text } from 'react-native'
 import { ThemeContext } from '../contexts/ThemeContext'
 import { LanguageContext } from '../contexts/LanguageContext'
 import { LocationContext } from '../contexts/LocationContext'
 import Container from '../components/common/Container'
 import Header from '../components/common/Header'
-import DashboardWidget from '../components/dashboard/DashboardWidget'
 import WeatherWidget from '../components/dashboard/WeatherWidget'
 import SafetyScoreWidget from '../components/dashboard/SafetyScoreWidget'
 
@@ -56,9 +54,7 @@ export default class Dashboard extends Component {
                 <Header title={t('dashboard.title')} subtitle={t('dashboard.welcome')} />
 
                 {locationLoading
-                  ? (
-                      this.renderLoading(t, t('dashboard.loadingLocation'))
-                    )
+                  ? this.renderLoading(t, t('dashboard.loadingLocation'))
                   : locationError
                     ? (
                       <View style={styles.errorContainer}>
@@ -81,7 +77,7 @@ export default class Dashboard extends Component {
                           weatherLoaded={weatherLoaded}
                         />
 
-                        <View style={styles.grid}>
+                        {/* <View style={styles.grid}>
                           <DashboardWidget
                             title={t('widgets.speed')}
                             value='12.5'
@@ -120,7 +116,7 @@ export default class Dashboard extends Component {
                             unit={t('units.degrees')}
                             type='position'
                           />
-                        </View>
+                        </View> */}
                       </ScrollView>
                       )}
               </Container>

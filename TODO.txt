@@ -1,2 +1,3 @@
 - Integrare NetInfo
 - Integrare geocoding API
+- Integrare visibility
