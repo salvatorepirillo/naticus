@@ -81,8 +81,6 @@ export const fr = {
     theme: 'Thème',
     lightTheme: 'Clair',
     darkTheme: 'Sombre',
-    security: 'Sécurité',
-    securityDescription: 'Protégez les actions sensibles',
     pin: 'Code PIN',
     pinDescription: 'PIN pour opérations critiques',
     setPin: 'Définir PIN',

@@ -98,8 +98,6 @@ export const it = {
     theme: 'Tema',
     lightTheme: 'Chiaro',
     darkTheme: 'Scuro',
-    security: 'Sicurezza',
-    securityDescription: 'Proteggi le azioni sensibili',
     pin: 'Codice PIN',
     pinDescription: 'PIN per operazioni critiche',
     setPin: 'Imposta PIN',

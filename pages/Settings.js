@@ -62,10 +62,10 @@ export default class Settings extends Component {
 
               {/* Sezione Sicurezza */}
               <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-                <SettingsRow
+                {/* <SettingsRow
                   title={t('settings.security')}
                   subtitle={t('settings.securityDescription')}
-                />
+                /> */}
 
                 <View style={[styles.separator, { backgroundColor: theme.colors.separator }]} />
 
