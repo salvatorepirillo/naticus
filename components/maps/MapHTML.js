@@ -8,11 +8,23 @@ export const generateMapHTML = (location) => {
     <head>
       <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <style>
-        body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-        #map { height: 100vh; width: 100vw; }
-        .leaflet-control-attribution { font-size: 10px; }
+        body { 
+          margin: 0; 
+          padding: 0; 
+          overflow: hidden; 
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+          background-color: #f0f8ff;
+        }
+        #map { 
+          height: 100vh; 
+          width: 100vw; 
+          background-color: #a8c8ec;
+        }
+        .leaflet-control-attribution { 
+          font-size: 10px; 
+          background: rgba(255, 255, 255, 0.8) !important;
+        }
         
         .offline-indicator {
           position: absolute;
@@ -27,6 +39,7 @@ export const generateMapHTML = (location) => {
           display: flex;
           align-items: center;
           gap: 6px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         
         .status-dot {
@@ -38,139 +51,283 @@ export const generateMapHTML = (location) => {
         .online { background-color: #34C759; }
         .offline { background-color: #FF3B30; }
         
-        .debug-info {
+        .loading-overlay {
           position: absolute;
-          top: 50px;
-          left: 10px;
-          background: rgba(0, 0, 0, 0.8);
-          color: white;
-          padding: 10px;
-          border-radius: 5px;
-          font-size: 12px;
-          z-index: 1001;
-          max-width: 300px;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(240, 248, 255, 0.9);
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          z-index: 2000;
+          font-size: 16px;
+          color: #666;
+        }
+        
+        .loading-spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid #f3f3f3;
+          border-top: 4px solid #0066cc;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+          color: #ff3b30;
+          margin-top: 8px;
+          text-align: center;
+          padding: 0 20px;
         }
       </style>
     </head>
     <body>
+      <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div>Inizializzazione mappa...</div>
+      </div>
+      
       <div id="map"></div>
       
       <div class="offline-indicator" id="networkStatus">
         <div class="status-dot online" id="statusDot"></div>
         <span id="statusText">Online</span>
       </div>
-      
-      <div class="debug-info" id="debugInfo">
-        Inizializzazione...
-      </div>
 
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <script>
-        console.log('🚀 Script started');
+        console.log('🚀 Starting maritime map initialization');
         
         let map;
         let isOnline = true;
-        let debugInfo = '';
+        let mapInitialized = false;
         
-        function updateDebug(message) {
-          console.log('🐛 DEBUG:', message);
-          debugInfo += message + '\\n';
-          const debugEl = document.getElementById('debugInfo');
-          if (debugEl) {
-            debugEl.textContent = debugInfo;
+        function showLoading(message) {
+          const overlay = document.getElementById('loadingOverlay');
+          if (overlay) {
+            overlay.style.display = 'flex';
+            const textEl = overlay.querySelector('div:last-child');
+            if (textEl) textEl.textContent = message;
           }
+        }
+        
+        function hideLoading() {
+          const overlay = document.getElementById('loadingOverlay');
+          if (overlay) {
+            overlay.style.display = 'none';
+          }
+        }
+        
+        function showError(message) {
+          const overlay = document.getElementById('loadingOverlay');
+          if (overlay) {
+            overlay.innerHTML = \`
+              <div style="color: #ff3b30; font-size: 48px; margin-bottom: 16px;">❌</div>
+              <div>Errore caricamento mappa</div>
+              <div class="error-message">\${message}</div>
+            \`;
+            overlay.style.display = 'flex';
+          }
+          sendMessage({ type: 'mapError', error: message });
         }
         
         function sendMessage(data) {
-          console.log('📤 Sending message:', data);
+          console.log('📤 Sending message to React Native:', data);
           try {
-            if (window.ReactNativeWebView) {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
               window.ReactNativeWebView.postMessage(JSON.stringify(data));
-              updateDebug('✅ Message sent: ' + data.type);
+              console.log('✅ Message sent successfully');
             } else {
-              updateDebug('❌ ReactNativeWebView not available');
+              console.warn('❌ ReactNativeWebView.postMessage not available');
+              console.warn('Available methods:', Object.keys(window.ReactNativeWebView || {}));
             }
           } catch (error) {
-            updateDebug('❌ Error sending message: ' + error.message);
+            console.error('❌ Error sending message:', error);
           }
         }
         
+        function sendDebug(message) {
+          console.log('🐛 DEBUG:', message);
+          sendMessage({ type: 'debugInfo', message: message });
+        }
+        
+        // Check if Leaflet is loaded
+        function checkLeaflet() {
+          return new Promise((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds
+            
+            const checkInterval = setInterval(() => {
+              attempts++;
+              console.log(\`Checking Leaflet... attempt \${attempts}\`);
+              
+              if (typeof L !== 'undefined' && L.map) {
+                clearInterval(checkInterval);
+                console.log('✅ Leaflet loaded successfully');
+                resolve();
+              } else if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                console.error('❌ Leaflet failed to load after max attempts');
+                reject(new Error('Leaflet failed to load'));
+              }
+            }, 100);
+          });
+        }
+        
         // Initialize map
-        function initMap() {
-          updateDebug('🗺️ Initializing map...');
-          
+        async function initMap() {
           try {
-            if (typeof L === 'undefined') {
-              updateDebug('❌ Leaflet not loaded');
+            // Prevent double initialization
+            if (mapInitialized || map) {
+              sendDebug('Map already initialized, skipping');
               return;
             }
             
-            updateDebug('✅ Leaflet loaded');
+            showLoading('Caricamento librerie...');
+            sendDebug('Starting map initialization');
             
+            // Wait for Leaflet to load
+            await checkLeaflet();
+            
+            showLoading('Creazione mappa...');
+            sendDebug('Leaflet loaded, creating map');
+            
+            // Clean map container if needed
+            const mapContainer = document.getElementById('map');
+            if (mapContainer && mapContainer._leaflet_id) {
+              sendDebug('Cleaning existing map instance');
+              mapContainer._leaflet_id = null;
+              mapContainer.innerHTML = '';
+            }
+            
+            // Create map
             map = L.map('map', {
               center: [${lat}, ${lng}],
               zoom: 12,
               zoomControl: true,
-              attributionControl: false
+              attributionControl: true,
+              preferCanvas: false,
+              renderer: L.svg()
             });
             
-            updateDebug('✅ Map created');
+            sendDebug('Map element created');
             
-            // Simple base map layer
-            const baseMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            showLoading('Caricamento layer di base...');
+            
+            // Add base layer with error handling
+            const baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
               maxZoom: 18,
-              attribution: '© OpenStreetMap contributors'
+              attribution: '© OpenStreetMap contributors',
+              errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+              timeout: 10000
             });
             
-            baseMap.addTo(map);
-            updateDebug('✅ Base layer added');
+            baseLayer.on('loading', () => {
+              sendDebug('Base tiles loading...');
+            });
             
-            // Marine overlay
+            baseLayer.on('load', () => {
+              sendDebug('Base tiles loaded');
+            });
+            
+            baseLayer.on('tileerror', (e) => {
+              console.warn('Base tile error:', e);
+            });
+            
+            baseLayer.addTo(map);
+            sendDebug('Base layer added');
+            
+            showLoading('Caricamento dati nautici...');
+            
+            // Add marine overlay with error handling
             const seaMarks = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
-              opacity: 0.8,
-              maxZoom: 18
+              opacity: 0.7,
+              maxZoom: 18,
+              errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+              timeout: 15000
+            });
+            
+            seaMarks.on('loading', () => {
+              sendDebug('SeaMarks loading...');
+            });
+            
+            seaMarks.on('load', () => {
+              sendDebug('SeaMarks loaded');
+            });
+            
+            seaMarks.on('tileerror', (e) => {
+              console.warn('SeaMarks tile error:', e);
             });
             
             seaMarks.addTo(map);
-            updateDebug('✅ SeaMarks layer added');
+            sendDebug('SeaMarks layer added');
             
-            // Position marker
+            // Add position marker
             const marker = L.marker([${lat}, ${lng}], {
               title: 'Posizione attuale'
             }).addTo(map);
             
-            marker.bindPopup('<b>Posizione attuale</b><br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}');
-            updateDebug('✅ Marker added');
+            marker.bindPopup(\`
+              <div style="text-align: center;">
+                <b>📍 Posizione attuale</b><br>
+                <small>Lat: ${lat.toFixed(4)}</small><br>
+                <small>Lng: ${lng.toFixed(4)}</small>
+              </div>
+            \`);
             
-            // Scale control
+            sendDebug('Position marker added');
+            
+            // Add scale control
             L.control.scale({
               position: 'bottomleft',
               metric: true,
               imperial: false
             }).addTo(map);
             
-            updateDebug('✅ Scale control added');
+            sendDebug('Scale control added');
             
-            // Notify React Native that map is ready
-            sendMessage({ type: 'mapReady' });
-            updateDebug('✅ Map ready notification sent');
+            // Add layer control
+            const baseMaps = {
+              "OpenStreetMap": baseLayer
+            };
             
-            // Hide debug info after 5 seconds
+            const overlayMaps = {
+              "Carte Nautiche": seaMarks
+            };
+            
+            L.control.layers(baseMaps, overlayMaps, {
+              position: 'topright',
+              collapsed: true
+            }).addTo(map);
+            
+            sendDebug('Layer control added');
+            
+            // Wait a bit for tiles to start loading, then declare ready
             setTimeout(() => {
-              const debugEl = document.getElementById('debugInfo');
-              if (debugEl) {
-                debugEl.style.display = 'none';
-              }
-            }, 5000);
+              hideLoading();
+              mapInitialized = true;
+              sendMessage({ type: 'mapReady' });
+              sendDebug('Map initialization complete');
+            }, 2000);
             
           } catch (error) {
-            updateDebug('❌ Error initializing map: ' + error.message);
-            console.error('Error initializing map:', error);
+            console.error('❌ Error initializing map:', error);
+            showError(error.message || 'Errore sconosciuto durante l\\'inizializzazione');
           }
         }
         
         // Network status management
         function updateNetworkStatus(online) {
-          updateDebug('🌐 Network status: ' + (online ? 'online' : 'offline'));
+          console.log('🌐 Network status:', online ? 'online' : 'offline');
           isOnline = online;
           const statusDot = document.getElementById('statusDot');
           const statusText = document.getElementById('statusText');
@@ -184,45 +341,81 @@ export const generateMapHTML = (location) => {
               statusText.textContent = 'Offline';
             }
           }
+          sendDebug(\`Network status updated: \${online ? 'online' : 'offline'}\`);
         }
         
-        // Download functionality placeholder
-        function startRegionDownload() {
-          updateDebug('📥 Download requested');
+        // Download functionality
+        function getBounds() {
+          sendDebug('getBounds called');
           
-          if (!map) {
-            updateDebug('❌ Map not ready for download');
+          if (!map || !mapInitialized) {
+            sendDebug('Map not ready for bounds request');
+            sendMessage({ 
+              type: 'downloadError', 
+              error: 'Mappa non pronta' 
+            });
             return;
           }
           
-          const bounds = map.getBounds();
-          const zoom = map.getZoom();
-          
-          updateDebug('📍 Sending bounds: ' + JSON.stringify({
-            north: bounds.getNorth().toFixed(4),
-            south: bounds.getSouth().toFixed(4),
-            east: bounds.getEast().toFixed(4),
-            west: bounds.getWest().toFixed(4)
-          }));
-          
-          sendMessage({
-            type: 'boundsReady',
-            bounds: {
+          try {
+            const bounds = map.getBounds();
+            const zoom = map.getZoom();
+            
+            const boundsData = {
               north: bounds.getNorth(),
               south: bounds.getSouth(),
               east: bounds.getEast(),
               west: bounds.getWest()
-            },
-            zoom: zoom,
-            zoomLevels: [Math.max(1, zoom - 1), Math.min(18, zoom + 1)]
-          });
+            };
+            
+            sendDebug(\`Sending bounds: \${JSON.stringify(boundsData)}\`);
+            
+            sendMessage({
+              type: 'boundsReady',
+              bounds: boundsData,
+              zoom: zoom,
+              zoomLevels: [Math.max(1, zoom - 1), Math.min(18, zoom + 1)]
+            });
+          } catch (error) {
+            console.error('Error getting bounds:', error);
+            sendMessage({ 
+              type: 'downloadError', 
+              error: \`Errore ottenimento bounds: \${error.message}\`
+            });
+          }
+        }
+        
+        function navigateToRegion(bounds) {
+          sendDebug('navigateToRegion called');
+          
+          if (!map || !mapInitialized) {
+            sendDebug('Map not ready for navigation');
+            return;
+          }
+          
+          try {
+            const leafletBounds = L.latLngBounds(
+              [bounds.south, bounds.west],
+              [bounds.north, bounds.east]
+            );
+            
+            map.fitBounds(leafletBounds, { 
+              padding: [20, 20],
+              maxZoom: 16
+            });
+            
+            sendDebug('Navigation completed');
+          } catch (error) {
+            console.error('Error navigating to region:', error);
+            sendDebug(\`Navigation error: \${error.message}\`);
+          }
         }
         
         // Handle messages from React Native
-        window.addEventListener('message', function(event) {
+        function handleMessage(event) {
           try {
             const data = JSON.parse(event.data);
-            updateDebug('📨 Received: ' + data.type);
+            sendDebug(\`Received message: \${data.type}\`);
             
             switch (data.type) {
               case 'networkStatus':
@@ -230,48 +423,89 @@ export const generateMapHTML = (location) => {
                 break;
                 
               case 'navigateToRegion':
-                if (data.bounds && map) {
-                  const bounds = L.latLngBounds(
-                    [data.bounds.south, data.bounds.west],
-                    [data.bounds.north, data.bounds.east]
-                  );
-                  map.fitBounds(bounds, { padding: [20, 20] });
-                  updateDebug('✅ Navigated to region');
+                if (data.bounds) {
+                  navigateToRegion(data.bounds);
                 }
                 break;
                 
               case 'getBounds':
               case 'startDownload':
-                startRegionDownload();
+                getBounds();
+                break;
+                
+              case 'clearCache':
+                sendDebug('Cache clear requested (no action needed in WebView)');
                 break;
                 
               default:
-                updateDebug('❓ Unknown message: ' + data.type);
+                sendDebug(\`Unknown message type: \${data.type}\`);
             }
           } catch (error) {
-            updateDebug('❌ Message error: ' + error.message);
+            console.error('Error handling message:', error);
+            sendDebug(\`Message handling error: \${error.message}\`);
           }
-        });
+        }
         
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-          updateDebug('📄 DOM loaded');
+        // Setup message listener
+        if (window.addEventListener) {
+          window.addEventListener('message', handleMessage);
+          sendDebug('Message listener setup via addEventListener');
+        } else if (window.attachEvent) {
+          window.attachEvent('onmessage', handleMessage);
+          sendDebug('Message listener setup via attachEvent');
+        } else {
+          sendDebug('❌ No message listener method available');
+        }
+        
+        // Check ReactNativeWebView availability
+        function checkReactNativeWebView() {
+          if (window.ReactNativeWebView) {
+            sendDebug('✅ ReactNativeWebView available');
+            sendDebug(\`Available methods: \${Object.keys(window.ReactNativeWebView)}\`);
+          } else {
+            sendDebug('❌ ReactNativeWebView not available');
+            // Polyfill for testing
+            window.ReactNativeWebView = {
+              postMessage: (message) => {
+                console.log('📤 Polyfill postMessage:', message);
+              }
+            };
+          }
+        }
+        
+        // Initialize everything when DOM is ready
+        function startInitialization() {
+          console.log('🚀 Starting initialization');
+          
+          // Prevent multiple initializations
+          if (mapInitialized || map) {
+            sendDebug('Initialization already started or completed');
+            return;
+          }
+          
+          checkReactNativeWebView();
           initMap();
-        });
+        }
         
-        // Fallback initialization
-        window.addEventListener('load', function() {
-          updateDebug('🪟 Window loaded');
-          if (!map) {
-            updateDebug('⚠️ Fallback init');
-            initMap();
-          }
-        });
+        // Single initialization trigger
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', startInitialization);
+          sendDebug('Waiting for DOMContentLoaded');
+        } else if (document.readyState === 'interactive' || document.readyState === 'complete') {
+          startInitialization();
+          sendDebug('DOM already loaded, starting immediately');
+        }
         
-        // Expose functions
+        // Remove the window.load fallback to prevent double initialization
+        
+        // Expose functions globally for debugging
+        window.initMap = initMap;
         window.updateNetworkStatus = updateNetworkStatus;
+        window.getBounds = getBounds;
+        window.sendMessage = sendMessage;
+        window.sendDebug = sendDebug;
         
-        updateDebug('✅ Script setup complete');
+        sendDebug('Script setup complete');
       </script>
     </body>
     </html>

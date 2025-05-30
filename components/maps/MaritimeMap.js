@@ -1,4 +1,4 @@
-import { View, StyleSheet, ActivityIndicator, Alert, Text } from 'react-native'
+import { View, StyleSheet, ActivityIndicator, Alert, Text, TouchableOpacity } from 'react-native'
 import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
 import { ThemeContext } from '../../contexts/ThemeContext'
@@ -19,17 +19,26 @@ export default class MaritimeMap extends Component {
     this.state = {
       location: null,
       loading: true,
+      webViewLoading: true,
+      mapReady: false,
       showOfflineModal: false,
       downloadProgress: 0,
       isDownloading: false,
       downloadInfo: null,
       offlineRegions: [],
       cacheInfo: { size: 0, formattedSize: '0B', entries: 0 },
-      notification: { message: '', type: 'info', visible: false }
+      notification: { message: '', type: 'info', visible: false },
+      error: null
     }
     this.webViewRef = null
     this.boundsTimeout = null
     this.mapReadyTimeout = null
+    this.locationInitialized = false
+  }
+
+  async componentDidMount () {
+    await this.initializeLocation()
+    await this.loadOfflineData()
   }
 
   componentWillUnmount () {
@@ -60,73 +69,130 @@ export default class MaritimeMap extends Component {
   initializeLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
+
       if (status === 'granted') {
         const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High
+          accuracy: Location.Accuracy.High,
+          timeout: 10000
         })
-        this.setState({ location, loading: false })
+
+        this.setState({
+          location,
+          loading: false,
+          error: null
+        })
+        this.locationInitialized = true
       } else {
-        this.setState({ loading: false })
+        this.setState({
+          location: {
+            coords: {
+              latitude: 43.7696,
+              longitude: 11.2558
+            }
+          },
+          loading: false,
+          error: 'Permesso GPS negato - usando posizione predefinita'
+        })
+        this.locationInitialized = true
       }
     } catch (error) {
-      console.error('Location error:', error)
-      this.setState({ loading: false })
+      this.setState({
+        location: {
+          coords: {
+            latitude: 43.7696,
+            longitude: 11.2558
+          }
+        },
+        loading: false,
+        error: 'Errore GPS - usando posizione predefinita'
+      })
+      this.locationInitialized = true
     }
   }
 
   // Gestione WebView
-  handleWebViewMessage = async (event) => {
-    const data = offlineMapService.parseWebViewMessage(event.nativeEvent.data)
-    if (!data) return
+  handleWebViewLoadStart = () => {
+    this.setState({ webViewLoading: true, mapReady: false })
+  }
 
-    console.log('📨 React Native received message:', data.type)
+  handleWebViewLoadEnd = () => {
+    this.setState({ webViewLoading: false })
 
-    switch (data.type) {
-      case 'downloadProgress':
-        this.setState({ downloadProgress: data.progress })
-        break
-
-      case 'downloadComplete':
-        await this.handleDownloadComplete(data)
-        break
-
-      case 'downloadError':
-        this.handleDownloadError(data)
-        break
-
-      case 'mapReady':
-        console.log('🗺️ Map ready')
+    // Timeout per dichiarare la mappa pronta se non arriva il messaggio
+    this.mapReadyTimeout = setTimeout(() => {
+      if (!this.state.mapReady) {
+        this.setState({ mapReady: true })
         this.notifyWebViewConnectivity()
-        break
+      }
+    }, 5000)
+  }
 
-      case 'boundsReady':
-        console.log('📐 Bounds received:', data.bounds)
+  handleWebViewError = (syntheticEvent) => {
+    const { nativeEvent } = syntheticEvent
+    console.error('WebView error:', nativeEvent)
+    this.setState({
+      error: `Errore caricamento mappa: ${nativeEvent.description || 'Errore sconosciuto'}`,
+      webViewLoading: false
+    })
+  }
 
-        // Cancella timeout
-        if (this.boundsTimeout) {
-          clearTimeout(this.boundsTimeout)
-          this.boundsTimeout = null
-        }
+  handleWebViewMessage = async (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data)
 
-        // Risposta alla richiesta di bounds per download reale
-        if (data.bounds && this.state.isDownloading) {
-          const zoomLevels = data.zoomLevels || [Math.max(1, data.zoom - 1), Math.min(18, data.zoom + 1)]
-          console.log('🔥 Starting real download with bounds:', data.bounds, 'zoom levels:', zoomLevels)
-          await this.handleRealDownload(data.bounds, zoomLevels)
-        } else {
-          console.warn('❌ Bounds ready but not downloading or bounds missing')
-          if (!this.state.isDownloading) {
-            console.warn('Download state is false')
+      switch (data.type) {
+        case 'mapReady':
+          if (this.mapReadyTimeout) {
+            clearTimeout(this.mapReadyTimeout)
+            this.mapReadyTimeout = null
           }
-          if (!data.bounds) {
-            console.warn('Bounds data missing')
-          }
-          this.setState({ isDownloading: false })
-        }
-        break
+          this.setState({ mapReady: true, error: null })
+          this.notifyWebViewConnectivity()
+          break
 
-      default:
-        console.warn('❓ Unknown message type:', data.type)
+        case 'mapError':
+          console.error('Map initialization error:', data.error)
+          this.setState({
+            error: `Errore inizializzazione mappa: ${data.error}`,
+            mapReady: false
+          })
+          break
+
+        case 'downloadProgress':
+          this.setState({ downloadProgress: data.progress })
+          break
+
+        case 'downloadComplete':
+          await this.handleDownloadComplete(data)
+          break
+
+        case 'downloadError':
+          this.handleDownloadError(data)
+          break
+
+        case 'boundsReady':
+          if (this.boundsTimeout) {
+            clearTimeout(this.boundsTimeout)
+            this.boundsTimeout = null
+          }
+
+          if (data.bounds && this.state.isDownloading) {
+            const zoomLevels = data.zoomLevels || [Math.max(1, data.zoom - 1), Math.min(18, data.zoom + 1)]
+            await this.handleRealDownload(data.bounds, zoomLevels)
+          } else {
+            this.setState({ isDownloading: false })
+          }
+          break
+
+        case 'debugInfo':
+          // Debug messages removed
+          break
+
+        default:
+          console.warn('Unknown message type:', data.type)
+      }
+    } catch (error) {
+      console.error('Error parsing WebView message:', error)
     }
   }
 
@@ -137,7 +203,7 @@ export default class MaritimeMap extends Component {
     })
 
     const newRegion = await offlineMapService.addOfflineRegion({
-      name: data.regionName,
+      name: data.regionName || `Area ${new Date().toLocaleDateString()}`,
       bounds: data.bounds,
       estimatedSize: data.estimatedSize,
       zoomLevels: data.zoomLevels,
@@ -152,46 +218,44 @@ export default class MaritimeMap extends Component {
 
   handleDownloadError = (data) => {
     this.setState({ isDownloading: false, downloadProgress: 0 })
-    this.showNotification('❌ Errore durante il download', 'error')
+    this.showNotification(`❌ Errore durante il download: ${data.error || 'Errore sconosciuto'}`, 'error')
   }
 
   notifyWebViewConnectivity = () => {
-    if (this.webViewRef) {
-      const message = offlineMapService.createWebViewMessage('networkStatus', {
-        isOnline: this.context.isOnline
-      })
-      this.webViewRef.postMessage(message)
+    if (this.webViewRef && this.state.mapReady) {
+      try {
+        const message = JSON.stringify({
+          type: 'networkStatus',
+          isOnline: true
+        })
+        this.webViewRef.postMessage(message)
+      } catch (error) {
+        console.error('Error sending connectivity status:', error)
+      }
     }
   }
 
   // Azioni offline - DOWNLOAD REALE
   handleStartDownload = async () => {
-    const connectivityContext = this.context
-
-    if (!connectivityContext.requiresConnection('download')) {
-      this.showNotification('⚠️ Connessione necessaria per scaricare', 'warning')
-      return
-    }
-
-    console.log('🚀 Starting download process...')
     this.setState({ isDownloading: true, downloadProgress: 0 })
 
-    // Richiedi bounds dalla WebView
-    if (this.webViewRef) {
-      console.log('📤 Requesting bounds from WebView...')
-      const message = offlineMapService.createWebViewMessage('getBounds')
-      this.webViewRef.postMessage(message)
+    if (this.webViewRef && this.state.mapReady) {
+      try {
+        const message = JSON.stringify({ type: 'getBounds' })
+        this.webViewRef.postMessage(message)
 
-      // Timeout di sicurezza
-      this.boundsTimeout = setTimeout(() => {
-        console.error('⏰ Timeout waiting for bounds from WebView')
+        this.boundsTimeout = setTimeout(() => {
+          this.setState({ isDownloading: false })
+          this.showNotification('❌ Timeout: WebView non risponde', 'error')
+        }, 10000)
+      } catch (error) {
+        console.error('Error requesting bounds:', error)
         this.setState({ isDownloading: false })
-        this.showNotification('❌ Timeout: WebView non risponde', 'error')
-      }, 5000)
+        this.showNotification('❌ Errore comunicazione con mappa', 'error')
+      }
     } else {
-      console.error('❌ WebView ref not available')
       this.setState({ isDownloading: false })
-      this.showNotification('❌ Errore: WebView non disponibile', 'error')
+      this.showNotification('❌ Mappa non pronta per il download', 'error')
     }
   }
 
@@ -282,13 +346,11 @@ export default class MaritimeMap extends Component {
 
   clearCache = async () => {
     try {
-      // Comunica alla WebView
-      if (this.webViewRef) {
-        const message = offlineMapService.createWebViewMessage('clearCache')
+      if (this.webViewRef && this.state.mapReady) {
+        const message = JSON.stringify({ type: 'clearCache' })
         this.webViewRef.postMessage(message)
       }
 
-      // Pulisci cache locale
       const success = await offlineMapService.clearCache()
 
       if (success) {
@@ -327,14 +389,20 @@ export default class MaritimeMap extends Component {
   }
 
   handleNavigateToRegion = (region) => {
-    if (this.webViewRef && region.bounds) {
-      const message = offlineMapService.createWebViewMessage('navigateToRegion', {
-        bounds: region.bounds
-      })
-      this.webViewRef.postMessage(message)
+    if (this.webViewRef && this.state.mapReady && region.bounds) {
+      try {
+        const message = JSON.stringify({
+          type: 'navigateToRegion',
+          bounds: region.bounds
+        })
+        this.webViewRef.postMessage(message)
 
-      this.setState({ showOfflineModal: false })
-      this.showNotification('📍 Navigazione verso regione', 'info')
+        this.setState({ showOfflineModal: false })
+        this.showNotification('📍 Navigazione verso regione', 'info')
+      } catch (error) {
+        console.error('Error navigating to region:', error)
+        this.showNotification('❌ Errore navigazione', 'error')
+      }
     }
   }
 
@@ -390,13 +458,26 @@ export default class MaritimeMap extends Component {
   }
 
   render () {
-    const { loading } = this.state
+    const { loading, webViewLoading, mapReady, error } = this.state
 
+    // Mostra loading se stiamo ancora inizializzando la posizione
     if (loading) {
       return (
         <View style={[styles.container, styles.centered]}>
           <ActivityIndicator size='large' color='#0066cc' />
-          <Text style={styles.loadingText}>Caricamento mappa...</Text>
+          <Text style={styles.loadingText}>Inizializzazione GPS...</Text>
+        </View>
+      )
+    }
+
+    // Mostra errore se c'è un problema critico
+    if (error && !this.state.location) {
+      return (
+        <View style={[styles.container, styles.centered]}>
+          <Text style={styles.errorText}>❌ {error}</Text>
+          <TouchableOpacity onPress={this.initializeLocation} style={styles.retryButton}>
+            <Text style={styles.retryText}>Riprova</Text>
+          </TouchableOpacity>
         </View>
       )
     }
@@ -405,6 +486,7 @@ export default class MaritimeMap extends Component {
       <ConnectivityContext.Consumer>
         {(connectivityContext) => (
           <View style={styles.container}>
+            {/* WebView per la mappa */}
             <WebView
               ref={ref => { this.webViewRef = ref }}
               source={{ html: generateMapHTML(this.state.location) }}
@@ -412,13 +494,10 @@ export default class MaritimeMap extends Component {
               originWhitelist={['*']}
               javaScriptEnabled
               domStorageEnabled
-              startInLoadingState={false}
-              onLoadStart={() => console.log('🔄 WebView load start')}
-              onLoadEnd={() => console.log('✅ WebView load end')}
-              onError={(error) => {
-                console.error('❌ WebView error:', error.nativeEvent)
-                this.showNotification('❌ Errore caricamento mappa', 'error')
-              }}
+              startInLoadingState
+              onLoadStart={this.handleWebViewLoadStart}
+              onLoadEnd={this.handleWebViewLoadEnd}
+              onError={this.handleWebViewError}
               onMessage={this.handleWebViewMessage}
               allowsInlineMediaPlayback
               mixedContentMode='compatibility'
@@ -426,15 +505,38 @@ export default class MaritimeMap extends Component {
               incognito={false}
               showsHorizontalScrollIndicator={false}
               showsVerticalScrollIndicator={false}
+              renderLoading={() => (
+                <View style={[styles.container, styles.centered]}>
+                  <ActivityIndicator size='large' color='#0066cc' />
+                  <Text style={styles.loadingText}>Caricamento mappa...</Text>
+                </View>
+              )}
             />
 
-            <MapControls
-              isOnline={connectivityContext.isOnline}
-              cacheInfo={this.state.cacheInfo}
-              offlineRegions={this.state.offlineRegions}
-              onShowOfflineModal={this.handleShowOfflineModal}
-            />
+            {/* Overlay di caricamento se la WebView non è pronta */}
+            {(webViewLoading || !mapReady) && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size='large' color='#0066cc' />
+                <Text style={styles.loadingText}>
+                  {webViewLoading ? 'Caricamento WebView...' : 'Inizializzazione mappa...'}
+                </Text>
+                {error && (
+                  <Text style={styles.errorText}>⚠️ {error}</Text>
+                )}
+              </View>
+            )}
 
+            {/* Controlli mappa - mostrati solo quando la mappa è pronta */}
+            {mapReady && (
+              <MapControls
+                isOnline={connectivityContext?.isOnline ?? true}
+                cacheInfo={this.state.cacheInfo}
+                offlineRegions={this.state.offlineRegions}
+                onShowOfflineModal={this.handleShowOfflineModal}
+              />
+            )}
+
+            {/* Modal offline */}
             <OfflineModal
               visible={this.state.showOfflineModal}
               isDownloading={this.state.isDownloading}
@@ -442,7 +544,7 @@ export default class MaritimeMap extends Component {
               downloadInfo={this.state.downloadInfo}
               offlineRegions={this.state.offlineRegions}
               cacheInfo={this.state.cacheInfo}
-              isOnline={connectivityContext.isOnline}
+              isOnline={connectivityContext?.isOnline ?? true}
               onHide={this.handleHideOfflineModal}
               onStartDownload={this.handleStartDownload}
               onAbortDownload={this.handleAbortDownload}
@@ -452,6 +554,7 @@ export default class MaritimeMap extends Component {
               onRenameRegion={this.handleRenameRegion}
             />
 
+            {/* Notifiche */}
             <Notification
               visible={this.state.notification.visible}
               message={this.state.notification.message}
@@ -477,9 +580,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(240, 248, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666'
+    color: '#666',
+    textAlign: 'center'
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#ff3b30',
+    textAlign: 'center',
+    paddingHorizontal: 20
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#0066cc',
+    borderRadius: 8
+  },
+  retryText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600'
   }
 })
