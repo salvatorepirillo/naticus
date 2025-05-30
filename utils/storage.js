@@ -12,7 +12,7 @@ const STORAGE_KEYS = {
   OFFLINE_MODE: 'offline_mode',
   MAP_CACHE_SIZE: 'map_cache_size',
   TILE_CACHE_INFO: 'tile_cache_info',
-  WEATHER_FAVORITE_LOCATIONS: 'weather_favorite_locations' // Nuova chiave
+  FAVORITES_STORAGE_KEY: 'weather_favorite_locations' // Aggiunta chiave mancante che punta alla stessa chiave
 }
 
 export const storage = {

@@ -37,7 +37,7 @@ export default class MaritimeMap extends Component {
   }
 
   async componentDidMount () {
-    await this.initializeLocation()
+    await this.handleInitializeLocation()
     await this.loadOfflineData()
   }
 
@@ -66,7 +66,7 @@ export default class MaritimeMap extends Component {
     }
   }
 
-  initializeLocation = async () => {
+  handleInitializeLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
 
@@ -442,7 +442,7 @@ export default class MaritimeMap extends Component {
     })
   }
 
-  hideNotification = () => {
+  handleHideNotification = () => {
     this.setState({
       notification: { message: '', type: 'info', visible: false }
     })
@@ -475,7 +475,7 @@ export default class MaritimeMap extends Component {
       return (
         <View style={[styles.container, styles.centered]}>
           <Text style={styles.errorText}>❌ {error}</Text>
-          <TouchableOpacity onPress={this.initializeLocation} style={styles.retryButton}>
+          <TouchableOpacity onPress={this.handleInitializeLocation} style={styles.retryButton}>
             <Text style={styles.retryText}>Riprova</Text>
           </TouchableOpacity>
         </View>
@@ -559,7 +559,7 @@ export default class MaritimeMap extends Component {
               visible={this.state.notification.visible}
               message={this.state.notification.message}
               type={this.state.notification.type}
-              onHide={this.hideNotification}
+              onHide={this.handleHideNotification}
             />
           </View>
         )}

@@ -506,14 +506,14 @@ export default class WeatherWidget extends Component {
               <Text style={[styles.locationIcon, { color: theme.colors.primary }]}>
                 {isCurrentLocation ? '📍' : '🌍'}
               </Text>
-              <View style={styles.locationInfo}>
-                <View style={styles.locationTitleRow}>
+              <View style={styles.locationInfoExpanded}>
+                <View style={styles.locationTitleContainer}>
                   <Text style={[styles.locationPrimary, { color: theme.colors.text }]}>
                     {locationData.city || locationData.locality || locationData.principalSubdivision}
                   </Text>
                   {!isCurrentLocation && (
-                    <TouchableOpacity onPress={this.handleToggleFavorite} style={styles.favoriteButton}>
-                      <Text style={[styles.favoriteIcon, { color: isLocationFavorite ? theme.colors.warning : theme.colors.textMuted }]}>
+                    <TouchableOpacity onPress={this.handleToggleFavorite} style={styles.favoriteButtonExpanded}>
+                      <Text style={[styles.favoriteIconExpanded, { color: isLocationFavorite ? theme.colors.warning : theme.colors.textMuted }]}>
                         {isLocationFavorite ? '⭐' : '☆'}
                       </Text>
                     </TouchableOpacity>
@@ -978,13 +978,31 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12 },
 
   locationHeader: { flexDirection: 'row', alignItems: 'flex-start' },
-  locationTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%'
+  locationInfoExpanded: {
+    flex: 1,
+    marginLeft: 8
   },
-  locationPrimary: { fontSize: 18, fontWeight: '600', marginBottom: 2, flex: 1 },
+  locationTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 4
+  },
+  locationPrimary: {
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    marginRight: 12,
+    flexWrap: 'wrap'
+  },
+  favoriteButtonExpanded: {
+    padding: 4,
+    minWidth: 32,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  favoriteIconExpanded: { fontSize: 20 },
   locationSecondary: { fontSize: 14, marginBottom: 4 },
   coordinates: { fontSize: 12, fontFamily: 'monospace' },
 
