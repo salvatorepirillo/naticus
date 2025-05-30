@@ -1,7 +1,7 @@
 {
   "name": "naticus",
   "license": "0BSD",
-  "version": "2025.05.29",
+  "version": "2025.05.30",
   "main": "index.js",
   "scripts": {
     "start": "expo start",

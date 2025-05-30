@@ -25,7 +25,8 @@ export default class WeatherWidget extends Component {
       favoriteLocations: [],
       showFavoritesModal: false,
       isCurrentLocation: true,
-      isLocationFavorite: false
+      isLocationFavorite: false,
+      forecastTab: 'current' // 'current', 'forecast'
     }
   }
 
@@ -355,8 +356,24 @@ export default class WeatherWidget extends Component {
     return { condition: 'Molto agitato', color: 'danger', icon: '🌊' }
   }
 
+  getDayName = (dateString) => {
+    const date = new Date(dateString)
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(today.getDate() + 1)
+
+    if (date.toDateString() === today.toDateString()) return 'Oggi'
+    if (date.toDateString() === tomorrow.toDateString()) return 'Domani'
+
+    return date.toLocaleDateString('it-IT', { weekday: 'short' })
+  }
+
   handleToggleExpanded = () => {
     this.setState({ expanded: !this.state.expanded })
+  }
+
+  handleTabChange = (tab) => {
+    this.setState({ forecastTab: tab })
   }
 
   renderFavoritesModal = (t) => {
@@ -488,7 +505,109 @@ export default class WeatherWidget extends Component {
     )
   }
 
-  renderExpandedView = (t) => {
+  renderForecastView = (t) => {
+    const { theme } = this.context
+    const { weatherData, marineData } = this.state
+
+    if (!weatherData || !weatherData.daily) return null
+
+    const daily = weatherData.daily
+    const marineDaily = marineData?.daily
+
+    return (
+      <ScrollView style={styles.forecastScrollView} showsVerticalScrollIndicator={false}>
+        {daily.time.slice(0, 7).map((date, index) => (
+          <View key={date} style={[styles.forecastDay, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <View style={styles.forecastHeader}>
+              <Text style={[styles.dayName, { color: theme.colors.text }]}>
+                {this.getDayName(date)}
+              </Text>
+              <Text style={[styles.dayDate, { color: theme.colors.textSecondary }]}>
+                {new Date(date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}
+              </Text>
+            </View>
+
+            <View style={styles.forecastContent}>
+              <View style={styles.forecastMain}>
+                <Text style={[styles.forecastIcon, { color: theme.colors.primary }]}>
+                  {this.getWeatherIcon(daily.weather_code[index], true)}
+                </Text>
+                <View style={styles.temperatureRange}>
+                  <Text style={[styles.maxTemp, { color: theme.colors.text }]}>
+                    {Math.round(daily.temperature_2m_max[index])}°
+                  </Text>
+                  <Text style={[styles.minTemp, { color: theme.colors.textSecondary }]}>
+                    {Math.round(daily.temperature_2m_min[index])}°
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.forecastDetails}>
+                <View style={styles.forecastRow}>
+                  <View style={styles.forecastItem}>
+                    <Text style={[styles.forecastLabel, { color: theme.colors.textMuted }]}>Vento</Text>
+                    <Text style={[styles.forecastValue, { color: theme.colors.text }]}>
+                      {Math.round(daily.wind_speed_10m_max[index] * 1.94384)} kt
+                    </Text>
+                    <Text style={[styles.forecastSubvalue, { color: theme.colors.textMuted }]}>
+                      {this.getWindDirection(daily.wind_direction_10m_dominant[index])}
+                    </Text>
+                  </View>
+
+                  {marineDaily && marineDaily.wave_height_max[index] !== null && (
+                    <View style={styles.forecastItem}>
+                      <Text style={[styles.forecastLabel, { color: theme.colors.textMuted }]}>Mare</Text>
+                      <Text style={[styles.forecastValue, { color: theme.colors.text }]}>
+                        {marineDaily.wave_height_max[index].toFixed(1)}m
+                      </Text>
+                      <Text style={[styles.forecastSubvalue, { color: theme.colors.textMuted }]}>
+                        {this.getSeaCondition(marineDaily.wave_height_max[index]).condition}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={styles.forecastItem}>
+                    <Text style={[styles.forecastLabel, { color: theme.colors.textMuted }]}>Pioggia</Text>
+                    <Text style={[styles.forecastValue, { color: theme.colors.text }]}>
+                      {daily.precipitation_sum[index].toFixed(0)}mm
+                    </Text>
+                    <Text style={[styles.forecastSubvalue, { color: theme.colors.textMuted }]}>
+                      {daily.precipitation_probability_max[index]}%
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.forecastRow}>
+                  <View style={styles.forecastItem}>
+                    <Text style={[styles.forecastLabel, { color: theme.colors.textMuted }]}>Alba</Text>
+                    <Text style={[styles.forecastValue, { color: theme.colors.text }]}>
+                      {new Date(daily.sunrise[index]).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+
+                  <View style={styles.forecastItem}>
+                    <Text style={[styles.forecastLabel, { color: theme.colors.textMuted }]}>Tramonto</Text>
+                    <Text style={[styles.forecastValue, { color: theme.colors.text }]}>
+                      {new Date(daily.sunset[index]).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+
+                  <View style={styles.forecastItem}>
+                    <Text style={[styles.forecastLabel, { color: theme.colors.textMuted }]}>UV Max</Text>
+                    <Text style={[styles.forecastValue, { color: theme.colors.text }]}>
+                      {daily.uv_index_max[index].toFixed(0)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    )
+  }
+
+  renderCurrentView = (t) => {
     const { theme } = this.context
     const { weatherData, marineData, locationData, isCurrentLocation, isLocationFavorite } = this.state
 
@@ -741,6 +860,48 @@ export default class WeatherWidget extends Component {
     )
   }
 
+  renderExpandedView = (t) => {
+    const { forecastTab } = this.state
+
+    return (
+      <View style={styles.expandedContainer}>
+        {/* Tab buttons */}
+        <View style={styles.tabContainer}>
+          {this.renderTabButton('current', '📊 Attuale', t)}
+          {this.renderTabButton('forecast', '📅 7 Giorni', t)}
+        </View>
+
+        {/* Tab content */}
+        {forecastTab === 'current' ? this.renderCurrentView(t) : this.renderForecastView(t)}
+      </View>
+    )
+  }
+
+  renderTabButton = (tabId, title, t) => {
+    const { theme } = this.context
+    const { forecastTab } = this.state
+    const isActive = forecastTab === tabId
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.tabButton,
+          { backgroundColor: isActive ? theme.colors.primary : theme.colors.surface },
+          { borderColor: theme.colors.border }
+        ]}
+        onPress={() => this.handleTabChange(tabId)}
+      >
+        <Text style={[
+          styles.tabButtonText,
+          { color: isActive ? '#FFFFFF' : theme.colors.text }
+        ]}
+        >
+          {title}
+        </Text>
+      </TouchableOpacity>
+    )
+  }
+
   render () {
     const { theme } = this.context
     const { loading, error, expanded, weatherData, favoriteLocations } = this.state
@@ -972,8 +1133,31 @@ const styles = StyleSheet.create({
   compactValue: { fontSize: 16, fontWeight: '600' },
   compactDirection: { fontSize: 12, marginTop: 2 },
 
-  expandedScrollView: { flex: 1 },
+  expandedContainer: { flex: 1 },
   expandedHeight: { minHeight: 800 },
+
+  // Tab styles
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center'
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '600'
+  },
+
+  // Current view styles
+  expandedScrollView: { flex: 1 },
   section: { margin: 8, padding: 12, borderRadius: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12 },
 
@@ -1027,6 +1211,78 @@ const styles = StyleSheet.create({
   seaCondition: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
   waveHeight: { fontSize: 16 },
   marineDetails: { width: '100%' },
+
+  // Forecast view styles
+  forecastScrollView: { flex: 1, paddingHorizontal: 8 },
+  forecastDay: {
+    marginVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden'
+  },
+  forecastHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)'
+  },
+  dayName: {
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  dayDate: {
+    fontSize: 14
+  },
+  forecastContent: {
+    padding: 16
+  },
+  forecastMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16
+  },
+  forecastIcon: {
+    fontSize: 32
+  },
+  temperatureRange: {
+    alignItems: 'flex-end'
+  },
+  maxTemp: {
+    fontSize: 20,
+    fontWeight: '700'
+  },
+  minTemp: {
+    fontSize: 16,
+    marginTop: 2
+  },
+  forecastDetails: {
+    gap: 12
+  },
+  forecastRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  forecastItem: {
+    alignItems: 'center',
+    flex: 1
+  },
+  forecastLabel: {
+    fontSize: 12,
+    marginBottom: 4
+  },
+  forecastValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2
+  },
+  forecastSubvalue: {
+    fontSize: 11,
+    textAlign: 'center'
+  },
 
   noDataContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 20 },
   noDataIcon: { fontSize: 48, marginBottom: 8 },
