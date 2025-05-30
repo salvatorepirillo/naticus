@@ -6,7 +6,7 @@ import { LanguageProvider, LanguageContext } from './contexts/LanguageContext'
 import { LoadingProvider } from './contexts/LoadingContext'
 import { Dashboard, Maps, Settings } from './pages'
 import { Text } from 'react-native'
-import { LocationProvider } from './contexts'
+import { ConnectivityProvider, LocationProvider } from './contexts'
 
 const Tab = createBottomTabNavigator()
 
@@ -46,9 +46,11 @@ export default class App extends Component {
       <LoadingProvider>
         <LanguageProvider>
           <ThemeProvider>
-            <LocationProvider>
-              <AppContent />
-            </LocationProvider>
+            <ConnectivityProvider>
+              <LocationProvider>
+                <AppContent />
+              </LocationProvider>
+            </ConnectivityProvider>
           </ThemeProvider>
         </LanguageProvider>
       </LoadingProvider>
